@@ -14,7 +14,7 @@
     <ProjectGuid>{E92137D5-B374-4216-9A96-6AD67965B2EE}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>DebugPasses</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
     <ProjectName>DebugPasses</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -25,6 +25,7 @@
     <Import Project="..\..\Falcor\Falcor.props" />
   </ImportGroup>
   <ItemGroup>
+    <ClCompile Include="ColorMapPass\ColorMapPass.cpp" />
     <ClCompile Include="ComparisonPass.cpp" />
     <ClCompile Include="DebugPasses.cpp" />
     <ClCompile Include="InvalidPixelDetectionPass\InvalidPixelDetectionPass.cpp" />
@@ -32,6 +33,7 @@
     <ClCompile Include="SplitScreenPass\SplitScreenPass.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ColorMapPass\ColorMapPass.h" />
     <ClInclude Include="ComparisonPass.h" />
     <ClInclude Include="InvalidPixelDetectionPass\InvalidPixelDetectionPass.h" />
     <ClInclude Include="SideBySidePass\SideBySidePass.h" />
@@ -43,6 +45,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ShaderSource Include="ColorMapPass\ColorMapParams.slang" />
+    <ShaderSource Include="ColorMapPass\ColorMapPass.ps.slang" />
     <ShaderSource Include="Comparison.ps.slang" />
     <ShaderSource Include="InvalidPixelDetectionPass\InvalidPixelDetection.ps.slang" />
     <ShaderSource Include="SideBySidePass\SideBySide.ps.slang" />

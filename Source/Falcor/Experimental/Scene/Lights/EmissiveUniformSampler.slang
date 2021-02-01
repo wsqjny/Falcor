@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -28,7 +28,7 @@
 #include "Utils/Math/MathConstants.slangh"
 
 import Scene.Scene;
-import Utils.Sampling.SampleGenerator;
+import Utils.Sampling.SampleGeneratorInterface;
 import Experimental.Scene.Lights.EmissiveLightSamplerHelpers;
 import Experimental.Scene.Lights.EmissiveLightSamplerInterface;
 
@@ -47,19 +47,21 @@ struct EmissiveUniformSampler : IEmissiveLightSampler
     /** Draw a single light sample.
         \param[in] posW Shading point in world space.
         \param[in] normalW Normal at the shading point in world space.
+        \param[in] onSurface True if only upper hemisphere should be considered.
         \param[in,out] sg Sample generator.
         \param[out] ls Light sample. Only valid if true is returned.
         \return True if a sample was generated, false otherwise.
     */
-    bool sampleLight(const float3 posW, const float3 normalW, inout SampleGenerator sg, out TriangleLightSample ls)
+    bool sampleLight<S : ISampleGenerator>(const float3 posW, const float3 normalW, const bool onSurface, inout S sg, out TriangleLightSample ls)
     {
-        if (gScene.lightCollection.isEmpty()) return false;
+        if (gScene.lightCollection.getActiveTriangleCount() == 0) return false;
 
-        // Randomly pick a triangle out of the global list with uniform probability.
+        // Randomly pick a triangle out of the global list of active triangles with uniform probability.
         float uLight = sampleNext1D(sg);
-        uint triangleCount = gScene.lightCollection.triangleCount;
-        uint triangleIndex = min((uint)(uLight * triangleCount), triangleCount - 1); // Safety precaution as the result of the multiplication may be rounded to triangleCount even if uLight < 1.0 when triangleCount is large.
-        float triangleSelectionPdf = 1.0f / ((float)triangleCount);
+        uint triangleCount = gScene.lightCollection.getActiveTriangleCount();
+        uint idx = min((uint)(uLight * triangleCount), triangleCount - 1); // Safety precaution as the result of the multiplication may be rounded to triangleCount even if uLight < 1.0 when triangleCount is large.
+        uint triangleIndex = gScene.lightCollection.activeTriangles[idx];
+        float triangleSelectionPdf = 1.f / (float)triangleCount;
 
         // Sample the triangle uniformly.
         float2 u = sampleNext2D(sg);
@@ -70,18 +72,33 @@ struct EmissiveUniformSampler : IEmissiveLightSampler
         return true;
     }
 
+    /** Evaluate the PDF associated with selecting an emissive triangle.
+        \param[in] posW Shading point in world space.
+        \param[in] normalW Normal at the shading point in world space.
+        \param[in] onSurface True if only upper hemisphere should be considered.
+        \param[in] triangleIndex Index of selected triangle.
+        \return Probability of drawing the input triangle from an uniform distribution.
+    */
+    float evalTriangleSelectionPdf(const float3 posW, const float3 normalW, const bool onSurface, const uint triangleIndex)
+    {
+        if (triangleIndex == LightCollection::kInvalidIndex) return 0.f;
+
+        // Lights are chosen uniformly so the selection probability is just one over the number of lights.
+        return gScene.lightCollection.getActiveTriangleCount() > 0 ? 1.f / (float)gScene.lightCollection.getActiveTriangleCount() : 0.f;
+    }
+
     /** Evaluate the PDF at a shading point given a hit point on an emissive triangle.
         \param[in] posW Shading point in world space.
         \param[in] normalW Normal at the shading point in world space.
+        \param[in] onSurface True if only upper hemisphere should be considered.
         \param[in] hit Triangle hit data.
         \return Probability density with respect to solid angle at the shading point.
     */
-    float evalPdf(float3 posW, float3 normalW, const TriangleHit hit)
+    float evalPdf(const float3 posW, const float3 normalW, const bool onSurface, const TriangleHit hit)
     {
-        if (gScene.lightCollection.isEmpty()) return 0;
+        if (hit.triangleIndex == LightCollection::kInvalidIndex) return 0.f;
 
-        // Lights are chosen uniformly so the selection probability is just one over the number of lights.
-        float triangleSelectionPdf = 1.0f / ((float)gScene.lightCollection.triangleCount);
+        float triangleSelectionPdf = evalTriangleSelectionPdf(posW, normalW, onSurface, hit.triangleIndex);
 
         // Compute triangle sampling probability with respect to solid angle from the shading point.
         float trianglePdf = evalTrianglePdf(posW, hit);

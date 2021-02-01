@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -34,9 +34,6 @@
 
 #include "Testing/UnitTest.h"
 #include "SlangShared.slang"
-#include <DirectXPackedVector.h>
-
-using half = DirectX::PackedVector::HALF;
 
 namespace Falcor
 {
@@ -69,10 +66,6 @@ namespace Falcor
             ctx.unmapBuffer("result");
         }
 
-        half f32tof16(float fval) { return DirectX::PackedVector::XMConvertFloatToHalf(fval); }
-        float f16tof32(half hval) { return DirectX::PackedVector::XMConvertHalfToFloat(hval); }
-
-        uint32_t asuint(float a) { return *reinterpret_cast<uint32_t*>(&a); }
         uint64_t asuint64(double a) { return *reinterpret_cast<uint64_t*>(&a); }
     }
 
@@ -152,7 +145,7 @@ namespace Falcor
     */
     GPU_TEST(SlangDefaultInitializers)
     {
-        const uint32_t maxTests = 100, usedTests = 35;
+        const uint32_t maxTests = 100, usedTests = 37;
         std::vector<uint32_t> initData(maxTests, -1);
 
         auto test = [&](const std::string& shaderModel)
@@ -166,6 +159,8 @@ namespace Falcor
             for (uint32_t i = 0; i < maxTests; i++)
             {
                 uint32_t expected = i < usedTests ? 0 : -1;
+                if (i == 36) expected = (uint32_t)Type3::C;
+
                 EXPECT_EQ(result[i], expected) << "i = " << i << " (sm" << shaderModel << ")";
             }
             ctx.unmapBuffer("result");
@@ -178,5 +173,6 @@ namespace Falcor
         test("6_1");
         test("6_2");
         test("6_3");
+        test("6_5");
     }
 }

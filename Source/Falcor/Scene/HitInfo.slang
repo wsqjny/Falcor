@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -26,28 +26,49 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 import Utils.Math.FormatConversion;
-
-static const uint kInvalidIndex = 0xffffffff;
+__exported import Scene.HitInfoType;
 
 /** Ray hit information.
 
-    The fields in this struct uniquely identifies a hit point in terms
-    of mesh instance ID and primitive index, together with barycentrics.
+    The fields in the 'HitInfo' struct uniquely identifies a hit point in terms
+    of instance ID and primitive index, together with barycentrics.
 
     If the host sets the following defines, the struct includes helpers
-    for packing/unpacking the hit information into a 64-bit value.
+    for packing/unpacking the hit information. Use 'PackedHitInfo' in your code.
 
-    - HIT_INSTANCE_INDEX_BITS   Bits needed to encode the mesh instance ID of the hit
-    - HIT_TRIANGLE_INDEX_BITS   Bits needed to encode the primitive index of the hit
+    - HIT_INSTANCE_TYPE_BITS    Bits needed to encode the instance type.
+    - HIT_INSTANCE_INDEX_BITS   Bits needed to encode the mesh instance ID of the hit.
+    - HIT_PRIMITIVE_INDEX_BITS  Bits needed to encode the primitive index of the hit.
 
-    Together the bit allocations must be 32 or less.
+    If a define is zero, no bits are needed (the field has only one possible value = 0).
 
 */
+
+#if defined(HIT_INSTANCE_TYPE_BITS) && defined(HIT_INSTANCE_INDEX_BITS) && defined(HIT_PRIMITIVE_INDEX_BITS)
+#if ((HIT_INSTANCE_TYPE_BITS) + (HIT_INSTANCE_INDEX_BITS) + (HIT_PRIMITIVE_INDEX_BITS)) <= 32
+    typedef uint2 PackedHitInfo;
+#elif ((HIT_INSTANCE_TYPE_BITS) + (HIT_INSTANCE_INDEX_BITS)) <= 32 && (HIT_PRIMITIVE_INDEX_BITS) <= 32
+    typedef uint3 PackedHitInfo;
+#else
+    #error HitInfo instance or primitive index bits exceed the maximum supported
+#endif
+#endif
+
 struct HitInfo
 {
-    uint    meshInstanceID;     ///< Mesh instance ID at hit.
-    uint    primitiveIndex;     ///< Primitive index at hit.
-    float2  barycentrics;       ///< Barycentric coordinates at ray hit, always in [0,1].
+    InstanceType    type = InstanceType::TriangleMesh;  ///< Type of instance.
+    uint            instanceID;                         ///< Instance ID at hit.
+    uint            primitiveIndex;                     ///< Primitive index at hit.
+    float2          barycentrics;                       ///< Barycentric coordinates at ray hit, always in [0,1].
+
+    static const uint kInvalidIndex = 0xffffffff;
+
+    /** Return instance type that was hit.
+    */
+    InstanceType getType()
+    {
+        return type;
+    }
 
     /** Return the barycentric weights.
     */
@@ -56,30 +77,64 @@ struct HitInfo
         return float3(1.f - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
     }
 
-#if defined(HIT_INSTANCE_INDEX_BITS) && defined(HIT_TRIANGLE_INDEX_BITS)
-#if ((HIT_INSTANCE_INDEX_BITS) + (HIT_TRIANGLE_INDEX_BITS)) > 32
-    #error HitInfo instance/primitive index bits exceed 32 bits
-#endif
+#if defined(HIT_INSTANCE_TYPE_BITS) && defined(HIT_INSTANCE_INDEX_BITS) && defined(HIT_PRIMITIVE_INDEX_BITS)
 
-    /** Encode hit information to packed format.
+    static const uint kInstanceTypeBits = HIT_INSTANCE_TYPE_BITS;
+    static const uint kInstanceIndexBits = HIT_INSTANCE_INDEX_BITS;
+    static const uint kPrimitiveIndexBits = HIT_PRIMITIVE_INDEX_BITS;
+
+#if ((HIT_INSTANCE_TYPE_BITS) + (HIT_INSTANCE_INDEX_BITS) + (HIT_PRIMITIVE_INDEX_BITS)) <= 32
+
+    static const uint kInstanceIndexOffset = kPrimitiveIndexBits;
+    static const uint kInstanceTypeOffset = kInstanceIndexOffset + kInstanceIndexBits;
+
+    /** Encode hit information to packed 64-bit format.
     */
-    uint2 encode()
+    PackedHitInfo encode()
     {
-        uint2 packed;
-        packed.x = (meshInstanceID << (HIT_TRIANGLE_INDEX_BITS)) | primitiveIndex;
+        PackedHitInfo packed;
+        packed.x = (uint(type) << kInstanceTypeOffset) | (instanceID << kInstanceIndexOffset) | primitiveIndex;
         packed.y = packUnorm2x16_unsafe(barycentrics);
         return packed;
     }
 
-    /** Decode hit information from packed format.
+    /** Decode hit information from packed 64-bit format.
         \return True if the hit information is valid.
     */
-    [mutating] bool decode(uint2 packed)
+    [mutating] bool decode(PackedHitInfo packed)
     {
-        meshInstanceID = packed.x >> (HIT_TRIANGLE_INDEX_BITS);
-        primitiveIndex = packed.x & ((1 << (HIT_TRIANGLE_INDEX_BITS)) - 1);
+        type = InstanceType(packed.x >> kInstanceTypeOffset);
+        instanceID = (packed.x >> kInstanceIndexOffset) & ((1 << kInstanceIndexBits) - 1);
+        primitiveIndex = packed.x & ((1 << kPrimitiveIndexBits) - 1);
         barycentrics = unpackUnorm2x16(packed.y);
         return packed.x != kInvalidIndex;
     }
+
+#elif ((HIT_INSTANCE_TYPE_BITS) + (HIT_INSTANCE_INDEX_BITS)) <= 32 && (HIT_PRIMITIVE_INDEX_BITS) <= 32
+
+    /** Encode hit information to packed 96-bit format.
+    */
+    PackedHitInfo encode()
+    {
+        PackedHitInfo packed;
+        packed.x = (uint(type) << kInstanceIndexBits) | instanceID;
+        packed.y = primitiveIndex;
+        packed.z = packUnorm2x16_unsafe(barycentrics);
+        return packed;
+    }
+
+    /** Decode hit information from packed 96-bit format.
+        \return True if the hit information is valid.
+    */
+    [mutating] bool decode(PackedHitInfo packed)
+    {
+        type = InstanceType(packed.x >> kInstanceIndexBits);
+        instanceID = packed.x & ((1 << kInstanceIndexBits) - 1);
+        primitiveIndex = packed.y;
+        barycentrics = unpackUnorm2x16(packed.z);
+        return packed.x != kInvalidIndex;
+    }
+
+#endif
 #endif
 };

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -131,6 +131,12 @@ struct Foo
     A f;
 };
 
+struct Foo2
+{
+    int a;
+    Type3 t = Type3::C;
+};
+
 [numthreads(1, 1, 1)]
 void testDefaultInitializers()
 {
@@ -226,5 +232,17 @@ void testDefaultInitializers()
         result[i++] = asuint(foo.f.b);
     }
 
-    // All done (i=35)
+    // Struct with enum (i=35)
+    {
+        Foo2 foo;
+        foo.a = 1;
+        foo.t = Type3::B;
+
+        foo = {};
+
+        result[i++] = (uint)foo.a;
+        result[i++] = (uint)foo.t; // Enum should be initialized to its default value specified in the struct declaration (i=36)
+    }
+
+    // All done (i=37)
 }

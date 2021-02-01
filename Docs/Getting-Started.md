@@ -7,7 +7,7 @@
 ## Solution and Project Layout
 
 ### Falcor
-All core framework features and code are contained within the `Falcor` project in the solution. This is a DLL project and is not executable on its own. 
+All core framework features and code are contained within the `Falcor` project in the solution. This is a DLL project and is not executable on its own.
 
 ### Samples
 Projects in the `Samples` folder (`HelloDXR`, `ModelViewer`, and `ShaderToy`) are applications using Falcor directly that demonstrate how to use some of the fundamental features and abstractions Falcor provides.
@@ -16,7 +16,7 @@ Projects in the `Samples` folder (`HelloDXR`, `ModelViewer`, and `ShaderToy`) ar
 The `Mogwai` project is an application created using Falcor that simplifies using render graphs and provides some useful utilities. Some sample render graphs are located under its project folder: `Source/Mogwai/Data/`.
 
 ### RenderPasses
-The `RenderPasses` folder contains a number of components ("Render Passes") that can be assembled to create render graphs. These components are required for some of the included sample render graphs, but will not build unless you select them manually (Right-Click -> `Build`), or use `Build Solution`. 
+The `RenderPasses` folder contains a number of components ("Render Passes") that can be assembled to create render graphs. These components are required for some of the included sample render graphs, but will not build unless you select them manually (Right-Click -> `Build`), or use `Build Solution`.
 
 -----------------------
 ## Workflows
@@ -24,7 +24,7 @@ The `RenderPasses` folder contains a number of components ("Render Passes") that
 There are two main workflows when using Falcor:
 
 ### Render Graphs
-The recommended workflow when prototyping or implementing rendering techniques is to create render passes, render graphs, then render them with Mogwai. The [tutorials](../Tutorials/index.md) focus on this workflow.
+The recommended workflow when prototyping or implementing rendering techniques is to create render passes, render graphs, then render them with Mogwai. The [tutorials](./Tutorials/index.md) focus on this workflow.
 
 #### To run a sample Render Graph:
 1. Build the Falcor Solution
@@ -32,7 +32,7 @@ The recommended workflow when prototyping or implementing rendering techniques i
 3. Press `Ctrl+O`, or from the top menu bar, select `File` -> `Load Script`
 4. Select a Render Graph (.py file) in `Source/Mogwai/Data/`. Such as `ForwardRenderer.py`.
 5. Press `Ctrl+Shift+O`, or from the top menu bar, select `File` -> `Load Scene`.
-6. Select a scene or model, such as `Media/Arcade/Arcade.fscene`
+6. Select a scene or model, such as `Media/Arcade/Arcade.pyscene`
 
 Scenes and Render Graphs can also be loaded through drag and drop.
 
@@ -65,9 +65,9 @@ When running from Visual Studio:
     - Any directory that was added to the data directories list by calling `addDataDirectory()`.
 - Falcor looks for Shader files relative to your project folder.
 
-Upon building, a project's `Data` folders and shader files will be automatically deployed to the `Data` and `Shader` folders in the executable directory while preserving folder hierarchy. When running an application from its executable, Falcor will search in these folders instead. This allows the build output folder to be self-contained for easy sharing.
+Upon building, a project's `Data` folder and shader files will be automatically deployed to the `Data` and `Shaders` folders in the executable directory while preserving folder hierarchy. When running an application from its executable, Falcor will search in these folders instead. This allows the build output folder to be self-contained for easy sharing.
 
-The best practice is to create a directory called `Data/` next to your **project** file and place all your data files there. Your shader files should also have a `.slang`, `.slangh`, `.hlsl`, or `.hlsli` extension. Files with these extensions will be marked with the `Shader Source` item type in Visual Studio, and only these files will be deployed. Headers with a `.h` should be used for host-only files. Headers that will be shared between host and shader files should use the `.slangh` extension.
+The best practice is to create a directory called `Data` next to your **project** file and place all your data files there. Your shader files should also have a `.slang`, `.slangh`, `.hlsl`, or `.hlsli` extension. Files with these extensions will be marked with the `Shader Source` item type in Visual Studio, and only these files will be deployed. Headers with a `.h` should be used for host-only files. Headers that will be shared between host and shader files should use the `.slang` or `.slangh` extension.
 
 To search for a data or shader file, call `findFileInDataDirectories()` or `findFileInShaderDirectories()` respectively.
 

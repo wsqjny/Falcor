@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -56,10 +56,10 @@ namespace Falcor
         addLine(quad[3], quad[0]);
     }
 
-    void DebugDrawer::addBoundingBox(const BoundingBox& aabb)
+    void DebugDrawer::addBoundingBox(const AABB& aabb)
     {
-        float3 min = aabb.center - aabb.extent;
-        float3 max = aabb.center + aabb.extent;
+        float3 min = aabb.minPoint;
+        float3 max = aabb.maxPoint;
 
         Quad bottomFace = { min, float3(max.x, min.y, min.z), float3(max.x, min.y, max.z), float3(min.x, min.y, max.z) };
         addQuad(bottomFace);

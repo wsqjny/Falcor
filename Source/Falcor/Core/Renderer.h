@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,7 +27,6 @@
  **************************************************************************/
 #pragma once
 #include "Utils/UI/UserInput.h"
-#include "Utils/ArgList.h"
 
 namespace Falcor
 {
@@ -36,7 +35,7 @@ namespace Falcor
 
     /** Sample configuration
     */
-    struct SampleConfig : ScriptBindings::enable_to_string
+    struct SampleConfig
     {
         Window::Desc windowDesc;                 ///< Controls window creation
         Device::Desc deviceDesc;                 ///< Controls device creation
@@ -50,71 +49,79 @@ namespace Falcor
     class IFramework
     {
     public:
-        /** Get the render-context for the current frame. This might change each frame*/
+        /** Get the render-context for the current frame. This might change each frame.
+        */
         virtual RenderContext* getRenderContext() = 0;
 
-        /** Get the current FBO*/
+        /** Get the current FBO.
+        */
         virtual std::shared_ptr<Fbo> getTargetFbo() = 0;
 
-        /** Get the window*/
+        /** Get the window.
+        */
         virtual Window* getWindow() = 0;
 
-        /** Get the global Clock object
+        /** Get the global Clock object.
         */
         virtual Clock& getGlobalClock() = 0;
 
-        /** Get the global FrameRate object
+        /** Get the global FrameRate object.
         */
         virtual FrameRate& getFrameRate() = 0;
 
-        /** Resize the swap-chain buffers*/
+        /** Resize the swap-chain buffers.
+        */
         virtual void resizeSwapChain(uint32_t width, uint32_t height) = 0;
 
-        /** Check if a key is pressed*/
+        /** Render a frame.
+        */
+        virtual void renderFrame() = 0;
+
+        /** Check if a key is pressed.
+        */
         virtual bool isKeyPressed(const KeyboardEvent::Key& key) = 0;
 
-        /** Show/hide the UI */
+        /** Show/hide the UI.
+        */
         virtual void toggleUI(bool showUI) = 0;
 
-        /** Show/hide the UI */
+        /** Show/hide the UI.
+        */
         virtual bool isUiEnabled() = 0;
-
-        /** Get the object storing command line arguments */
-        virtual ArgList getArgList() = 0;
 
         /** Takes and outputs a screenshot.
         */
         virtual std::string captureScreen(const std::string explicitFilename = "", const std::string explicitOutputDirectory = "") = 0;
 
-        /* Shutdown the app
+        /** Shutdown the app.
         */
         virtual void shutdown() = 0;
 
-        /** Pause/resume the renderer. The GUI will still be rendered
+        /** Pause/resume the renderer. The GUI will still be rendered.
         */
         virtual void pauseRenderer(bool pause) = 0;
 
-        /** Check if the renderer running
+        /** Check if the renderer running.
         */
         virtual bool isRendererPaused() = 0;
 
-        /** Get the current configuration
+        /** Get the current configuration.
         */
         virtual SampleConfig getConfig() = 0;
 
-        /** Render the global UI. You'll can open a GUI window yourself before calling it
+        /** Render the global UI. You'll can open a GUI window yourself before calling it.
         */
         virtual void renderGlobalUI(Gui* pGui) = 0;
 
-        /** Get the global shortcuts message
+        /** Get the global shortcuts message.
         */
         virtual std::string getKeyboardShortcutsStr() = 0;
 
-        /** Set VSYNC
+        /** Set VSYNC.
         */
         virtual void toggleVsync(bool on) = 0;
 
-        /** Get the VSYNC state
+        /** Get the VSYNC state.
         */
         virtual bool isVsyncEnabled() = 0;
     };

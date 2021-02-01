@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -30,6 +30,8 @@
 #include "Device.h"
 #include "RenderContext.h"
 #include "Utils/Threading.h"
+
+#include <mutex>
 
 namespace Falcor
 {
@@ -200,7 +202,7 @@ namespace Falcor
     {
         auto createFunc = [](Texture* pTexture, uint32_t mostDetailedMip, uint32_t mipCount, uint32_t firstArraySlice, uint32_t arraySize)
         {
-            return DepthStencilView::create(pTexture->shared_from_this(), mostDetailedMip, firstArraySlice, arraySize);
+            return DepthStencilView::create(std::static_pointer_cast<Texture>(pTexture->shared_from_this()), mostDetailedMip, firstArraySlice, arraySize);
         };
 
         return findViewCommon<DepthStencilView>(this, mipLevel, 1, firstArraySlice, arraySize, mDsvs, createFunc);
@@ -210,7 +212,7 @@ namespace Falcor
     {
         auto createFunc = [](Texture* pTexture, uint32_t mostDetailedMip, uint32_t mipCount, uint32_t firstArraySlice, uint32_t arraySize)
         {
-            return UnorderedAccessView::create(pTexture->shared_from_this(), mostDetailedMip, firstArraySlice, arraySize);
+            return UnorderedAccessView::create(std::static_pointer_cast<Texture>(pTexture->shared_from_this()), mostDetailedMip, firstArraySlice, arraySize);
         };
 
         return findViewCommon<UnorderedAccessView>(this, mipLevel, 1, firstArraySlice, arraySize, mUavs, createFunc);
@@ -226,11 +228,23 @@ namespace Falcor
         return getUAV(0);
     }
 
+#if _ENABLE_CUDA
+    void* Texture::getCUDADeviceAddress() const
+    {
+        throw std::exception("Texture::getCUDADeviceAddress() - unimplemented");
+    }
+
+    void* Texture::getCUDADeviceAddress(ResourceViewInfo const& viewInfo) const
+    {
+        throw std::exception("Texture::getCUDADeviceAddress() - unimplemented");
+    }
+#endif
+
     RenderTargetView::SharedPtr Texture::getRTV(uint32_t mipLevel, uint32_t firstArraySlice, uint32_t arraySize)
     {
         auto createFunc = [](Texture* pTexture, uint32_t mostDetailedMip, uint32_t mipCount, uint32_t firstArraySlice, uint32_t arraySize)
         {
-            return RenderTargetView::create(pTexture->shared_from_this(), mostDetailedMip, firstArraySlice, arraySize);
+            return RenderTargetView::create(std::static_pointer_cast<Texture>(pTexture->shared_from_this()), mostDetailedMip, firstArraySlice, arraySize);
         };
 
         return findViewCommon<RenderTargetView>(this, mipLevel, 1, firstArraySlice, arraySize, mRtvs, createFunc);
@@ -240,7 +254,7 @@ namespace Falcor
     {
         auto createFunc = [](Texture* pTexture, uint32_t mostDetailedMip, uint32_t mipCount, uint32_t firstArraySlice, uint32_t arraySize)
         {
-            return ShaderResourceView::create(pTexture->shared_from_this(), mostDetailedMip, mipCount, firstArraySlice, arraySize);
+            return ShaderResourceView::create(std::static_pointer_cast<Texture>(pTexture->shared_from_this()), mostDetailedMip, mipCount, firstArraySlice, arraySize);
         };
 
         return findViewCommon<ShaderResourceView>(this, mostDetailedMip, mipCount, firstArraySlice, arraySize, mSrvs, createFunc);
@@ -248,6 +262,11 @@ namespace Falcor
 
     void Texture::captureToFile(uint32_t mipLevel, uint32_t arraySlice, const std::string& filename, Bitmap::FileFormat format, Bitmap::ExportFlags exportFlags)
     {
+        if (format == Bitmap::FileFormat::DdsFile)
+        {
+            throw std::exception("Texture::captureToFile does not yet support saving to DDS.");
+        }
+
         assert(mType == Type::Texture2D);
         RenderContext* pContext = gpDevice->getRenderContext();
         // Handle the special case where we have an HDR texture with less then 3 channels
@@ -269,9 +288,11 @@ namespace Falcor
             textureData = pContext->readTextureSubresource(this, subresource);
         }
 
+        uint32_t width = getWidth(mipLevel);
+        uint32_t height = getHeight(mipLevel);
         auto func = [=]()
         {
-            Bitmap::saveImage(filename, getWidth(mipLevel), getHeight(mipLevel), format, exportFlags, resourceFormat, true, (void*)textureData.data());
+            Bitmap::saveImage(filename, width, height, format, exportFlags, resourceFormat, true, (void*)textureData.data());
         };
 
         Threading::dispatchTask(func);
@@ -279,6 +300,11 @@ namespace Falcor
 
     void Texture::uploadInitData(const void* pData, bool autoGenMips)
     {
+        // TODO: This is a hack to allow multi-threaded texture loading using AsyncTextureLoader.
+        // Replace with something better.
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+
         assert(gpDevice);
         auto pRenderContext = gpDevice->getRenderContext();
         if (autoGenMips)
@@ -326,14 +352,28 @@ namespace Falcor
         if (mReleaseRtvsAfterGenMips)
         {
             // Releasing RTVs to free space on the heap.
-            // We only do it once to handle the case that generateMips() was called during load. 
+            // We only do it once to handle the case that generateMips() was called during load.
             // If it was called more then once, the texture is probably dynamic and it's better to keep the RTVs around
             mRtvs.clear();
             mReleaseRtvsAfterGenMips = false;
         }
     }
 
-    uint32_t Texture::getTextureSizeInBytes()
+    uint64_t Texture::getTexelCount() const
+    {
+        uint64_t count = 0;
+        for (uint32_t i = 0; i < getMipCount(); i++)
+        {
+            uint64_t texelsInMip = (uint64_t)getWidth(i) * getHeight(i) * getDepth(i);
+            assert(texelsInMip > 0);
+            count += texelsInMip;
+        }
+        count *= getArraySize();
+        assert(count > 0);
+        return count;
+    }
+
+    uint64_t Texture::getTextureSizeInBytes() const
     {
         ID3D12DevicePtr pDevicePtr = gpDevice->getApiHandle();
         ID3D12ResourcePtr pTexResource = this->getApiHandle();
@@ -342,28 +382,27 @@ namespace Falcor
         D3D12_RESOURCE_DESC desc = pTexResource->GetDesc();
 
         assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D);
-        assert(desc.Width == mWidth);
-        assert(desc.Height == mHeight);
 
         d3d12ResourceAllocationInfo = pDevicePtr->GetResourceAllocationInfo(0, 1, &desc);
-        return (uint32_t)d3d12ResourceAllocationInfo.SizeInBytes;
+        assert(d3d12ResourceAllocationInfo.SizeInBytes > 0);
+        return d3d12ResourceAllocationInfo.SizeInBytes;
     }
 
     SCRIPT_BINDING(Texture)
     {
-        auto c = m.regClass(Texture);
-        c.roProperty("width", &Texture::getWidth);
-        c.roProperty("height", &Texture::getHeight);
-        c.roProperty("depth", &Texture::getDepth);
-        c.roProperty("mipCount", &Texture::getMipCount);
-        c.roProperty("arraySize", &Texture::getArraySize);
-        c.roProperty("samples", &Texture::getSampleCount);
-        c.roProperty("format", &Texture::getFormat);
+        pybind11::class_<Texture, Texture::SharedPtr> texture(m, "Texture");
+        texture.def_property_readonly("width", &Texture::getWidth);
+        texture.def_property_readonly("height", &Texture::getHeight);
+        texture.def_property_readonly("depth", &Texture::getDepth);
+        texture.def_property_readonly("mipCount", &Texture::getMipCount);
+        texture.def_property_readonly("arraySize", &Texture::getArraySize);
+        texture.def_property_readonly("samples", &Texture::getSampleCount);
+        texture.def_property_readonly("format", &Texture::getFormat);
 
         auto data = [](Texture* pTexture, uint32_t subresource)
         {
             return gpDevice->getRenderContext()->readTextureSubresource(pTexture, subresource);
         };
-        c.func_("data", data, "subresource"_a);
+        texture.def("data", data, "subresource"_a);
     }
 }

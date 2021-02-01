@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,25 +27,13 @@
  **************************************************************************/
 Texture2D<float4> gTexture;
 
-bool4 is_nan(float4 f)
-{
-    uint4 expMask = 0x7f800000;
-    uint4 mantissaMask = (~expMask) & (~0x80000000);
-    uint4 u = asuint(f);
-    if(all((expMask & u) != expMask)) return false;
-    if(any(mantissaMask & u)) return true;
-    return false;
-}
-
 float4 main(float2 texC : TEXCOORD) : SV_TARGET0
 {
     uint2 uv;
     gTexture.GetDimensions(uv.x, uv.y);
     int2 xy = int2(uv * texC);
     float4 value = gTexture.Load(int3(xy, 0));
-    if (any(is_nan(value)))
-        return float4(1, 0, 0, 1);
-    else if (any(isinf(value)))
-        return float4(0, 1, 0, 1);
+    if (any(isnan(value))) return float4(1, 0, 0, 1);
+    else if (any(isinf(value))) return float4(0, 1, 0, 1);
     return float4(0, 0, 0, 1);
 }

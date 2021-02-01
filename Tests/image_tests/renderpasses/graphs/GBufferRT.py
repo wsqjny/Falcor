@@ -4,11 +4,11 @@ def render_graph_GBufferRT():
     loadRenderPassLibrary("GBuffer.dll")
 
     g = RenderGraph("GBufferRT")
-    g.addPass(RenderPass("GBufferRT"), "GBufferRT")
+    g.addPass(createPass("GBufferRT"), "GBufferRT")
 
     g.markOutput("GBufferRT.posW")
     g.markOutput("GBufferRT.normW")
-    g.markOutput("GBufferRT.bitangentW")
+    g.markOutput("GBufferRT.tangentW")
     g.markOutput("GBufferRT.texC")
     g.markOutput("GBufferRT.diffuseOpacity")
     g.markOutput("GBufferRT.specRough")
@@ -16,6 +16,7 @@ def render_graph_GBufferRT():
     g.markOutput("GBufferRT.matlExtra")
 
     g.markOutput("GBufferRT.vbuffer")
+    g.markOutput("GBufferRT.linearZ")
     g.markOutput("GBufferRT.mvec")
     g.markOutput("GBufferRT.faceNormalW")
     g.markOutput("GBufferRT.viewW")

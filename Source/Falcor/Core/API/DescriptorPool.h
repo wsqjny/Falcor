@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -56,6 +56,7 @@ namespace Falcor
             Cbv,
             StructuredBufferUav,
             StructuredBufferSrv,
+            AccelerationStructureSrv,
             Dsv,
             Rtv,
             Sampler,
@@ -86,7 +87,7 @@ namespace Falcor
         };
 
         /** Create a new descriptor pool.
-            \param[in] desc Description of the desriptor type and count.
+            \param[in] desc Description of the descriptor type and count.
             \param[in] pFence Fence object for synchronization.
             \return A new object, or throws an exception if creation failed.
         */

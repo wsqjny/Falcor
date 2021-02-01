@@ -160,9 +160,6 @@
     <ClInclude Include="Scene\Lights\Light.h">
       <Filter>Scene\Lights</Filter>
     </ClInclude>
-    <ClInclude Include="Scene\Lights\LightProbe.h">
-      <Filter>Scene\Lights</Filter>
-    </ClInclude>
     <ClInclude Include="Scene\Material\Material.h">
       <Filter>Scene\Material</Filter>
     </ClInclude>
@@ -170,9 +167,6 @@
       <Filter>Testing</Filter>
     </ClInclude>
     <ClInclude Include="Utils\StringUtils.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\ArgList.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="Utils\BinaryFileStream.h">
@@ -214,12 +208,6 @@
       <Filter>Utils\UI</Filter>
     </ClInclude>
     <ClInclude Include="Utils\Image\Bitmap.h">
-      <Filter>Utils\Image</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\Image\DDSHeader.h">
-      <Filter>Utils\Image</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\Image\DXHeader.h">
       <Filter>Utils\Image</Filter>
     </ClInclude>
     <ClInclude Include="Utils\Algorithm\ParallelReduction.h">
@@ -367,9 +355,6 @@
     <ClInclude Include="Scene\SceneBuilder.h">
       <Filter>Scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\Externals\mikktspace\mikktspace.h">
-      <Filter>Externals\mikktspace</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\SampleGenerators\StratifiedSamplePattern.h">
       <Filter>Utils\SampleGenerators</Filter>
     </ClInclude>
@@ -439,9 +424,6 @@
     <ClInclude Include="Utils\Math\AABB.h">
       <Filter>Utils\Math</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\Math\BBox.h">
-      <Filter>Utils\Math</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\Math\CubicSpline.h">
       <Filter>Utils\Math</Filter>
     </ClInclude>
@@ -453,9 +435,6 @@
     </ClInclude>
     <ClInclude Include="Utils\AlignedAllocator.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Experimental\Scene\Lights\EnvProbe.h">
-      <Filter>Experimental\Scene\Lights</Filter>
     </ClInclude>
     <ClInclude Include="Experimental\Scene\Lights\EmissiveUniformSampler.h">
       <Filter>Experimental\Scene\Lights</Filter>
@@ -492,6 +471,69 @@
     </ClInclude>
     <ClInclude Include="Scene\HitInfo.h">
       <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Math\PackedFormats.h">
+      <Filter>Utils\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Experimental\Scene\Lights\EnvMap.h">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClInclude>
+    <ClInclude Include="Experimental\Scene\Lights\EnvMapSampler.h">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Timing\TimeReport.h">
+      <Filter>Utils\Timing</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Animation\Animatable.h">
+      <Filter>Scene\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Importer.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\AsyncTextureLoader.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Curves\CurveTessellation.h">
+      <Filter>Scene\Curves</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Scripting\ScriptWriter.h">
+      <Filter>Utils\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Math\MathHelpers.h">
+      <Filter>Utils\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Material\MaterialTextureLoader.h">
+      <Filter>Scene\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Transform.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\TriangleMesh.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Volume\Volume.h">
+      <Filter>Scene\Volume</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Volume\Grid.h">
+      <Filter>Scene\Volume</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Image\ImageIO.h">
+      <Filter>Utils\Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Program\CUDAProgram.h">
+      <Filter>Core\Program</Filter>
+    </ClInclude>
+    <ClInclude Include="Experimental\Scene\Lights\EnvMapLighting.h">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClInclude>
+    <ClInclude Include="Experimental\Scene\Volume\VolumeSampler.h">
+      <Filter>Experimental\Scene\Volume</Filter>
+    </ClInclude>
+    <ClInclude Include="Experimental\Scene\Lights\EmissivePowerSampler.h">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Sampling\AliasTable.h">
+      <Filter>Utils\Sampling</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -591,9 +633,6 @@
     <Filter Include="Scene\ParticleSystem">
       <UniqueIdentifier>{a5e366f9-af02-4a41-a630-621da069c661}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Externals\mikktspace">
-      <UniqueIdentifier>{32845222-2924-47c4-8b2e-43bf44e7a85a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Scene\Animation">
       <UniqueIdentifier>{6d9bd53c-0171-4f34-80ed-77d948789c2b}</UniqueIdentifier>
     </Filter>
@@ -635,6 +674,18 @@
     </Filter>
     <Filter Include="RenderPasses\Shared\PathTracer">
       <UniqueIdentifier>{dbf6e13a-7331-4de3-9123-6119e75c31d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\args">
+      <UniqueIdentifier>{5cbaba11-d15e-4d2c-8f4b-abaedd57c5c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene\Curves">
+      <UniqueIdentifier>{078c1d08-979e-42d3-bee0-adbbae09f8e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene\Volume">
+      <UniqueIdentifier>{dab1a8c2-24d6-4768-9cf8-eccf8df38c81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Experimental\Scene\Volume">
+      <UniqueIdentifier>{b71b1c11-7080-4491-9571-9daad77e3a75}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -884,9 +935,6 @@
     <ClCompile Include="Scene\Camera\Camera.cpp">
       <Filter>Scene\Camera</Filter>
     </ClCompile>
-    <ClCompile Include="Scene\Lights\LightProbe.cpp">
-      <Filter>Scene\Lights</Filter>
-    </ClCompile>
     <ClCompile Include="Scene\Lights\Light.cpp">
       <Filter>Scene\Lights</Filter>
     </ClCompile>
@@ -895,9 +943,6 @@
     </ClCompile>
     <ClCompile Include="Testing\UnitTest.cpp">
       <Filter>Testing</Filter>
-    </ClCompile>
-    <ClCompile Include="Utils\ArgList.cpp">
-      <Filter>Utils</Filter>
     </ClCompile>
     <ClCompile Include="Utils\Scripting\Scripting.cpp">
       <Filter>Utils\Scripting</Filter>
@@ -924,9 +969,6 @@
       <Filter>Utils\UI</Filter>
     </ClCompile>
     <ClCompile Include="Utils\Image\Bitmap.cpp">
-      <Filter>Utils\Image</Filter>
-    </ClCompile>
-    <ClCompile Include="Utils\Image\DXHeader.cpp">
       <Filter>Utils\Image</Filter>
     </ClCompile>
     <ClCompile Include="Utils\Algorithm\ParallelReduction.cpp">
@@ -1074,9 +1116,6 @@
     <ClCompile Include="Scene\SceneBuilder.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\Externals\mikktspace\mikktspace.c">
-      <Filter>Externals\mikktspace</Filter>
-    </ClCompile>
     <ClCompile Include="Utils\SampleGenerators\StratifiedSamplePattern.cpp">
       <Filter>Utils\SampleGenerators</Filter>
     </ClCompile>
@@ -1131,9 +1170,6 @@
     <ClCompile Include="Utils\Sampling\SampleGenerator.cpp">
       <Filter>Utils\Sampling</Filter>
     </ClCompile>
-    <ClCompile Include="Experimental\Scene\Lights\EnvProbe.cpp">
-      <Filter>Experimental\Scene\Lights</Filter>
-    </ClCompile>
     <ClCompile Include="Experimental\Scene\Lights\EmissiveUniformSampler.cpp">
       <Filter>Experimental\Scene\Lights</Filter>
     </ClCompile>
@@ -1170,6 +1206,66 @@
     <ClCompile Include="RenderPasses\Shared\PathTracer\PathTracer.cpp">
       <Filter>RenderPasses\Shared\PathTracer</Filter>
     </ClCompile>
+    <ClCompile Include="Experimental\Scene\Lights\EnvMap.cpp">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClCompile>
+    <ClCompile Include="Experimental\Scene\Lights\EnvMapSampler.cpp">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Timing\TimeReport.cpp">
+      <Filter>Utils\Timing</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Animation\Animatable.cpp">
+      <Filter>Scene\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Importer.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\HitInfo.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\AsyncTextureLoader.cpp">
+      <Filter>Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Curves\CurveTessellation.cpp">
+      <Filter>Scene\Curves</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Material\MaterialTextureLoader.cpp">
+      <Filter>Scene\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Transform.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\TriangleMesh.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Volume\Volume.cpp">
+      <Filter>Scene\Volume</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Volume\Grid.cpp">
+      <Filter>Scene\Volume</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Image\ImageIO.cpp">
+      <Filter>Utils\Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Program\CUDAProgram.cpp">
+      <Filter>Core\Program</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Math\AABB.cpp">
+      <Filter>Utils\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Experimental\Scene\Lights\EnvMapLighting.cpp">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClCompile>
+    <ClCompile Include="Experimental\Scene\Volume\VolumeSampler.cpp">
+      <Filter>Experimental\Scene\Volume</Filter>
+    </ClCompile>
+    <ClCompile Include="Experimental\Scene\Lights\EmissivePowerSampler.cpp">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Sampling\AliasTable.cpp">
+      <Filter>Utils\Sampling</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Xml Include="dependencies.xml" />
@@ -1200,12 +1296,6 @@
       <Filter>Experimental\Scene\Lights</Filter>
     </ShaderSource>
     <ShaderSource Include="Experimental\Scene\Lights\EmissiveUniformSampler.slang">
-      <Filter>Experimental\Scene\Lights</Filter>
-    </ShaderSource>
-    <ShaderSource Include="Experimental\Scene\Lights\EnvProbeSetup.cs.slang">
-      <Filter>Experimental\Scene\Lights</Filter>
-    </ShaderSource>
-    <ShaderSource Include="Experimental\Scene\Lights\EnvProbe.slang">
       <Filter>Experimental\Scene\Lights</Filter>
     </ShaderSource>
     <ShaderSource Include="Utils\Math\FormatConversion.slang">
@@ -1295,9 +1385,6 @@
     <ShaderSource Include="Utils\Algorithm\ParallelReduction.ps.slang">
       <Filter>Utils\Algorithm</Filter>
     </ShaderSource>
-    <ShaderSource Include="Scene\Lights\LightProbeIntegration.ps.slang">
-      <Filter>Scene\Lights</Filter>
-    </ShaderSource>
     <ShaderSource Include="Utils\UI\TextRenderer.slang">
       <Filter>Utils\UI</Filter>
     </ShaderSource>
@@ -1376,9 +1463,6 @@
     <ShaderSource Include="Scene\Material\MaterialData.slang">
       <Filter>Scene\Material</Filter>
     </ShaderSource>
-    <ShaderSource Include="Scene\Lights\LightProbeData.slang">
-      <Filter>Scene\Lights</Filter>
-    </ShaderSource>
     <ShaderSource Include="Scene\Lights\LightData.slang">
       <Filter>Scene\Lights</Filter>
     </ShaderSource>
@@ -1393,9 +1477,6 @@
     </ShaderSource>
     <ShaderSource Include="Utils\Math\MathConstants.slangh">
       <Filter>Utils\Math</Filter>
-    </ShaderSource>
-    <ShaderSource Include="Experimental\Scene\Lights\LightBVHStaticParams.slang">
-      <Filter>Experimental\Scene\Lights</Filter>
     </ShaderSource>
     <ShaderSource Include="Experimental\Scene\Lights\LightCollectionShared.slang">
       <Filter>Experimental\Scene\Lights</Filter>
@@ -1442,6 +1523,9 @@
     <ShaderSource Include="Scene\TextureSampler.slang">
       <Filter>Scene</Filter>
     </ShaderSource>
+    <ShaderSource Include="Scene\RaytracingInline.slang">
+      <Filter>Scene</Filter>
+    </ShaderSource>
     <ShaderSource Include="Scene\Camera\Camera.slang">
       <Filter>Scene\Camera</Filter>
     </ShaderSource>
@@ -1474,6 +1558,96 @@
     </ShaderSource>
     <ShaderSource Include="Scene\HitInfo.slang">
       <Filter>Scene</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Material\BxDFTypes.slang">
+      <Filter>Experimental\Scene\Material</Filter>
+    </ShaderSource>
+    <ShaderSource Include="RenderPasses\Shared\PathTracer\RayFootprint.slang">
+      <Filter>RenderPasses\Shared\PathTracer</Filter>
+    </ShaderSource>
+    <ShaderSource Include="RenderPasses\Shared\PathTracer\RayFootprintData.slang">
+      <Filter>RenderPasses\Shared\PathTracer</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Utils\Sampling\Pseudorandom\Xorshift32.slang">
+      <Filter>Utils\Sampling\Pseudorandom</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\LightBVHTypes.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMap.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMapSampler.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMapSamplerSetup.cs.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMapData.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="RenderPasses\Shared\PathTracer\RayFootprintModes.slangh">
+      <Filter>RenderPasses\Shared\PathTracer</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Utils\Sampling\Pseudorandom\Xorshift32.slang">
+      <Filter>Utils\Sampling\Pseudorandom</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Utils\Timing\GpuTimer.slang">
+      <Filter>Utils\Timing</Filter>
+    </ShaderSource>
+    <ShaderSource Include="RenderPasses\Shared\PathTracer\PixelStatsShared.slang">
+      <Filter>RenderPasses\Shared\PathTracer</Filter>
+    </ShaderSource>
+    <ShaderSource Include="RenderPasses\Shared\PathTracer\PixelStats.cs.slang">
+      <Filter>RenderPasses\Shared\PathTracer</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\Volume\VolumeData.slang">
+      <Filter>Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\Volume\Grid.slang">
+      <Filter>Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\Volume\Volume.slang">
+      <Filter>Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\NullTrace.cs.slang">
+      <Filter>Scene</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMapIntegration.ps.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EnvMapLighting.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Volume\VolumeSampler.slang">
+      <Filter>Experimental\Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Volume\PhaseFunctions.slang">
+      <Filter>Experimental\Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Volume\VolumeSamplerParams.slang">
+      <Filter>Experimental\Scene\Volume</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Lights\EmissivePowerSampler.slang">
+      <Filter>Experimental\Scene\Lights</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Material\BCSDF.slang">
+      <Filter>Experimental\Scene\Material</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Material\BCSDFConfig.slangh">
+      <Filter>Experimental\Scene\Material</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Experimental\Scene\Material\HairChiang16.slang">
+      <Filter>Experimental\Scene\Material</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\Intersection.slang">
+      <Filter>Scene</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Scene\HitInfoType.slang">
+      <Filter>Scene</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Utils\Sampling\AliasTable.slang">
+      <Filter>Utils\Sampling</Filter>
     </ShaderSource>
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,42 +27,42 @@
  **************************************************************************/
 
 /** Slots on the interior list have the following bit layout.
-    0-26  materialID
-    27    active bit
+    0-27  materialID
     28-31 nestedPriority
 
     We put the nestedPriority in the highest value bits in order to simplify sorting the list.
+    Internally the value 0 is reserved for empty slots.
 */
 
-static const uint kNoMaterial = 0xffffffff;
-
+#ifndef INTERIOR_LIST_SLOT_COUNT
 #define INTERIOR_LIST_SLOT_COUNT 2
-
-static const uint kInteriorListMaterialBits         = 27;
-static const uint kInteriorListActiveBits           = 1;
-static const uint kInteriorListNestedPriorityBits   = 4;
-
-static const uint kInteriorListMaterialOffset       = 0;
-static const uint kInteriorListActiveOffset         = kInteriorListMaterialOffset + kInteriorListMaterialBits;
-static const uint kInteriorListNestedPriorityOffset = kInteriorListActiveOffset + kInteriorListActiveBits;
-
-static const uint kInteriorListMaterialMask         = ((1 << kInteriorListMaterialBits) - 1) << kInteriorListMaterialOffset;
-static const uint kInteriorListActiveMask           = ((1 << kInteriorListActiveBits) - 1) << kInteriorListActiveOffset;
-static const uint kInteriorListNestedPriorityMask   = ((1 << kInteriorListNestedPriorityBits) - 1) << kInteriorListNestedPriorityOffset;
+#endif
 
 struct InteriorList
 {
+    static const uint kNoMaterial           = 0xffffffff;
+
+    static const uint kMaterialBits         = 28;
+    static const uint kNestedPriorityBits   = 4;
+
+    static const uint kMaterialOffset       = 0;
+    static const uint kNestedPriorityOffset = kMaterialOffset + kMaterialBits;
+
+    static const uint kMaterialMask         = ((1 << kMaterialBits) - 1) << kMaterialOffset;
+    static const uint kNestedPriorityMask   = ((1 << kNestedPriorityBits) - 1) << kNestedPriorityOffset;
+
+    static const uint kMaxNestedPriority    = ((1 << kNestedPriorityBits) - 1);
+
     uint slots[INTERIOR_LIST_SLOT_COUNT];
 
-    /** Make an active material slot given the material.
+    /** Make an active material slot given the material and priority.
         \param[in] materialID Material ID.
-        \param[in] nestedPriority Nested priority.
+        \param[in] nestedPriority Nested priority, 0 is reserved for empty slots.
         \return Returns the encoded slot.
     */
     uint makeSlot(uint materialID, uint nestedPriority)
     {
-        // Get nested priority of given material.
-        return (nestedPriority << kInteriorListNestedPriorityOffset) | kInteriorListActiveMask | (materialID & kInteriorListMaterialMask);
+        return (nestedPriority << kNestedPriorityOffset) | (materialID & kMaterialMask);
     }
 
     /** Check if a slot is active.
@@ -71,7 +71,7 @@ struct InteriorList
     */
     bool isSlotActive(uint slot)
     {
-        return slot & kInteriorListActiveMask;
+        return slot != 0;
     }
 
     /** Check if the interior list is empty.
@@ -88,7 +88,7 @@ struct InteriorList
     */
     uint getSlotNestedPriority(uint slot)
     {
-        return slot >> kInteriorListNestedPriorityOffset;
+        return slot >> kNestedPriorityOffset;
     }
 
     /** Get the material ID from a slot.
@@ -97,7 +97,7 @@ struct InteriorList
     */
     uint getSlotMaterialID(uint slot)
     {
-        return slot & kInteriorListMaterialMask;
+        return slot & kMaterialMask;
     }
 
     /** Return current highest nested priority on interior list.
@@ -129,24 +129,28 @@ struct InteriorList
     /** Check if an intersection with a given surface is a true intersection.
         True intersection occurs if nested priority of intersected mesh is equal or higher
         priority than the highest nested priority on the interior list.
-        \param[in] nestedPriority Nested priority of intersected surface.
+        \param[in] nestedPriority Nested priority of intersected surface, with 0 reserved for the highest possible priority.
         \return Returns true if intersection is a true intersection, false otherwise.
     */
     bool isTrueIntersection(uint nestedPriority)
     {
-        // Get nested priority of given material.
-        return nestedPriority >= getTopNestedPriority();
+        // Compare nested priority to current top of stack.
+        return nestedPriority == 0 || nestedPriority >= getTopNestedPriority();
     }
 
     /** Handle an intersection with a given material:
         If material is already on interior list -> remove it.
         If material is not on interior list -> add it.
         \param[in] materialID Material ID of intersected material.
-        \param[in] nestedPriority Nested priority of intersected surface.
+        \param[in] nestedPriority Nested priority of intersected surface, with 0 reserved for the highest possible priority.
         \param[in] entering True if material is entered, false if material is left.
     */
     [mutating] void handleIntersection(uint materialID, uint nestedPriority, bool entering)
     {
+        // Remap priority 0 to the highest priority to allow sorting by high->low priority,
+        // and as internally 0 is reserved for empty slots.
+        if (nestedPriority == 0) nestedPriority = kMaxNestedPriority;
+
         for (uint slotIndex = 0; slotIndex < INTERIOR_LIST_SLOT_COUNT; ++slotIndex)
         {
             uint slot = slots[slotIndex];

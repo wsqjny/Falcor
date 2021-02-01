@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -102,7 +102,6 @@ namespace Falcor
     public:
         using SharedPtr = ParameterBlockSharedPtr<ParameterBlock>;
         using SharedConstPtr = std::shared_ptr<const ParameterBlock>;
-        using ConstSharedPtrRef = const SharedPtr&;
         ~ParameterBlock();
 
         using BindLocation = ParameterBlockReflection::BindLocation;
@@ -160,15 +159,15 @@ namespace Falcor
             \param[in] pBuffer The buffer object
             \return false is the call failed, otherwise true
         */
-        bool setBuffer(const std::string& name, Buffer::ConstSharedPtrRef pBuffer);
+        bool setBuffer(const std::string& name, const Buffer::SharedPtr& pBuffer);
 
         /** Bind a buffer object by index
-            If the no buffer exists in the specified index or the bind flags don't match the shader requirements or the size doesn't match the required size, the call will fail.  
+            If the no buffer exists in the specified index or the bind flags don't match the shader requirements or the size doesn't match the required size, the call will fail.
             \param[in] bindLocation The bind-location in the block
             \param[in] pBuffer The buffer object
             \return false is the call failed, otherwise true
         */
-        bool setBuffer(const BindLocation& bindLocation, Buffer::ConstSharedPtrRef pBuffer);
+        bool setBuffer(const BindLocation& bindLocation, const Buffer::SharedPtr& pBuffer);
 
         /** Get a buffer
             \param[in] name The name of the buffer
@@ -320,7 +319,7 @@ namespace Falcor
         std::pair<Resource::SharedPtr, bool> getRootDescriptor(uint32_t resourceRangeIndex, uint32_t arrayIndex) const;
 
         void renderUI(Gui::Widgets& widget);
-        ParameterBlock::ConstSharedPtrRef getParameterBlock(uint32_t resourceRangeIndex, uint32_t arrayIndex) const;
+        const ParameterBlock::SharedPtr& getParameterBlock(uint32_t resourceRangeIndex, uint32_t arrayIndex) const;
 
         // Delete some functions. If they are not deleted, the compiler will try to convert the uints to string, resulting in runtime error
         Sampler::SharedPtr getSampler(uint32_t) = delete;
@@ -337,7 +336,47 @@ namespace Falcor
             Be cautious with the returned buffer as it can be invalidated any time you set/bind something
             to the parameter block (or one if its internal sub-blocks).
         */
-        Buffer::ConstSharedPtrRef getUnderlyingConstantBuffer() const;
+        const Buffer::SharedPtr& getUnderlyingConstantBuffer() const;
+
+#if _ENABLE_CUDA
+        /** Get a host-memory pointer that represents the contents of this shader object
+            as a CUDA-compatible buffer.
+
+            In the case where this parameter block represents a `ProgramVars`, the resulting
+            buffer can be passed as argument data for a kernel launch.
+
+            \return Host-memory pointer to a copy of the block, or throws on error
+            (e.g., parameter types that are unsupported on CUDA).
+
+            The lifetime of the returned pointer is tied to the `ParameterBlock`,
+            and does not need to be explicitly deleted by the caller. The pointer
+            may become invalid if:
+
+            * The parameter block is deleted
+            * A call to `getCUDADeviceBuffer()` is made on the same parameter block
+            * Another call it made to `getCUDAHostBuffer()` after changes have been made to parameters in the block
+        */
+        void* getCUDAHostBuffer(size_t& outSize);
+
+        /** Get a device-memory pointer that represents the contents of this shader object
+            as a CUDA-compatible buffer.
+
+            The resulting buffer can be used to represent this shader object when it
+            is used as a constant buffer or parameter block.
+
+            \return Device-memory pointer to a copy of the block, or throws on error
+            (e.g., parameter types that are unsupported on CUDA).
+
+            The lifetime of the returned pointer is tied to the `ParameterBlock`,
+            and does not need to be explicitly deleted by the caller. The pointer
+            may become invalid if:
+
+            * The parameter block is deleted
+            * A call to `getCUDAHostBuffer()` is made on the same parameter block
+            * Another call it made to `getCUDADeviceBuffer()` after changes have been made to parameters in the block
+        */
+        void* getCUDADeviceBuffer(size_t& outSize);
+#endif
 
         typedef uint64_t ChangeEpoch;
 
@@ -392,13 +431,13 @@ namespace Falcor
 
         struct AssignedSRV
         {
-            ShaderResourceView::SharedPtr pView;
+            ShaderResourceView::SharedPtr pView; // Can be a null view even when a valid resource is assigned, if the bind location is a root descriptor.
             Resource::SharedPtr pResource;
         };
 
         struct AssignedUAV
         {
-            UnorderedAccessView::SharedPtr pView;
+            UnorderedAccessView::SharedPtr pView; // Can be a null view even when a valid resource is assigned, if the bind location is a root descriptor.
             Resource::SharedPtr pResource;
         };
 
@@ -422,6 +461,7 @@ namespace Falcor
         bool checkDescriptorType(const BindLocation& bindLocation, const std::array<DescriptorSet::Type, N>& allowedTypes, const char* funcName) const;
         bool checkDescriptorSrvUavCommon(
             const BindLocation& bindLocation,
+            const Resource::SharedPtr& pResource,
             const std::variant<ShaderResourceView::SharedPtr, UnorderedAccessView::SharedPtr>& pView,
             const char* funcName) const;
         bool checkRootDescriptorResourceCompatibility(const Resource::SharedPtr& pResource, const std::string& funcName) const;
@@ -458,6 +498,53 @@ namespace Falcor
             ChangeEpoch epochOfLastChange;
         };
         mutable std::vector<DescriptorSetInfo> mSets;
+
+#if _ENABLE_CUDA
+
+        // The following members pertain to the issue of exposing the
+        // current state/contents of a shader object to CUDA kernels.
+
+        /** A kind of data buffer used for communicating with CUDA.
+        */
+        enum class CUDABufferKind
+        {
+            Host,   ///< A buffer in host memory
+            Device, ///< A buffer in device memory
+        };
+
+        /** Get a CUDA-compatible buffer that represents the contents of this shader object.
+        */
+        void* getCUDABuffer(
+            CUDABufferKind  bufferKind,
+            size_t& outSize);
+
+        /** Get a CUDA-compatible buffer that represents the contents of this shader object.
+        */
+        void* getCUDABuffer(
+            const ParameterBlockReflection* pReflector,
+            CUDABufferKind                  bufferKind,
+            size_t& outSize);
+
+        /** Update the CUDA-compatible buffer stored on this parameter block to reflect
+            the current state of the shader object.
+        */
+        void updateCUDABuffer(
+            const ParameterBlockReflection* pReflector,
+            CUDABufferKind                  bufferKind);
+
+        /** Information about the CUDA buffer (if any) used to represnet the state of
+            this shader object
+        */
+        struct UnderlyingCUDABuffer
+        {
+            Buffer::SharedPtr   pBuffer;
+            void*               pData                       = nullptr;
+            ChangeEpoch         epochOfLastObservedChange   = 0;
+            size_t              size                        = 0;
+            CUDABufferKind      kind                        = CUDABufferKind::Host;
+        };
+        UnderlyingCUDABuffer mUnderlyingCUDABuffer;
+#endif
     };
 
     template<typename T> bool ShaderVar::setImpl(const T& val) const

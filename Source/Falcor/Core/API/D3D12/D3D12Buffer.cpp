@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -50,13 +50,14 @@ namespace Falcor
         bufDesc.SampleDesc.Count = 1;
         bufDesc.SampleDesc.Quality = 0;
         bufDesc.Width = size;
+        assert(bufDesc.Width > 0);
 
         D3D12_RESOURCE_STATES d3dState = getD3D12ResourceState(initState);
         ID3D12ResourcePtr pApiHandle;
         D3D12_HEAP_FLAGS heapFlags = is_set(bindFlags, ResourceBindFlags::Shared) ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE;
         d3d_call(pDevice->CreateCommittedResource(&heapProps, heapFlags, &bufDesc, d3dState, nullptr, IID_PPV_ARGS(&pApiHandle)));
-        
-        // Map and upload data if needed
+        assert(pApiHandle);
+
         return pApiHandle;
     }
 

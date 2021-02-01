@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -28,6 +28,7 @@
 #pragma once
 #include "MaterialData.slang"
 #include "MaterialDefines.slangh"
+#include "Scene/Transform.h"
 
 namespace Falcor
 {
@@ -52,6 +53,16 @@ namespace Falcor
                 - RGB - Specular Color
                 - A   - Gloss
 
+        ShadingModelHairChiang16
+            BaseColor
+                - RGB - Absorption coefficient, sigmaA
+                - A   - Unused
+            Specular
+                - R   - Longitudinal roughness, betaM
+                - G   - Azimuthal roughness, betaN
+                - B   - The angle that the small scales on the surface of hair are offset from the base cylinder (in degrees).
+                - A   - Unused
+
         Common for all shading models
             Emissive
                 - RGB - Emissive Color
@@ -64,7 +75,6 @@ namespace Falcor
     {
     public:
         using SharedPtr = std::shared_ptr<Material>;
-        using ConstSharedPtrRef = const SharedPtr&;
         using SharedConstPtr = std::shared_ptr<const Material>;
 
         /** Flags indicating if and what was updated in the material
@@ -74,6 +84,21 @@ namespace Falcor
             None                = 0x0,  ///< Nothing updated
             DataChanged         = 0x1,  ///< Material data (properties) changed
             ResourcesChanged    = 0x2,  ///< Material resources (textures, sampler) changed
+        };
+
+        /** Texture slots available in the material
+        */
+        enum class TextureSlot
+        {
+            BaseColor,
+            Specular,
+            Emissive,
+            Normal,
+            Occlusion,
+            SpecularTransmission,
+            Displacement,
+
+            Count // Must be last
         };
 
         /** Create a new material.
@@ -112,29 +137,62 @@ namespace Falcor
         */
         const std::string& getName() const { return mName; }
 
+        /** Set one of the available texture slots.
+        */
+        void setTexture(TextureSlot slot, Texture::SharedPtr pTexture);
+
+        /** Load one of the available texture slots.
+        */
+        void loadTexture(TextureSlot slot, const std::string& filename, bool useSrgb = true);
+
+        /** Clear one of the available texture slots.
+        */
+        void clearTexture(TextureSlot slot);
+
+        /** Get one of the available texture slots.
+        */
+        Texture::SharedPtr getTexture(TextureSlot slot) const;
+
+        /** Return the maximum dimensions of the bound textures.
+        */
+        uint2 getMaxTextureDimensions() const;
+
+        /** Check if a texture is required to be in sRGB format
+            Note: This depends on the shading model being used for the material.
+        */
+        bool isSrgbTextureRequired(TextureSlot slot);
+
         /** Set the base color texture
         */
-        void setBaseColorTexture(Texture::SharedPtr pBaseColor);
+        void setBaseColorTexture(Texture::SharedPtr pBaseColor) { setTexture(TextureSlot::BaseColor, pBaseColor); }
 
         /** Get the base color texture
         */
-        Texture::SharedPtr getBaseColorTexture() const { return mResources.baseColor; }
+        Texture::SharedPtr getBaseColorTexture() const { return getTexture(TextureSlot::BaseColor); }
 
         /** Set the specular texture
         */
-        void setSpecularTexture(Texture::SharedPtr pSpecular);
+        void setSpecularTexture(Texture::SharedPtr pSpecular) { setTexture(TextureSlot::Specular, pSpecular); }
 
         /** Get the specular texture
         */
-        Texture::SharedPtr getSpecularTexture() const { return mResources.specular; }
+        Texture::SharedPtr getSpecularTexture() const { return getTexture(TextureSlot::Specular); }
 
         /** Set the emissive texture
         */
-        void setEmissiveTexture(const Texture::SharedPtr& pEmissive);
+        void setEmissiveTexture(const Texture::SharedPtr& pEmissive) { setTexture(TextureSlot::Emissive, pEmissive); }
 
         /** Get the emissive texture
         */
-        Texture::SharedPtr getEmissiveTexture() const { return mResources.emissive; }
+        Texture::SharedPtr getEmissiveTexture() const { return getTexture(TextureSlot::Emissive); }
+
+        /** Set the specular transmission texture
+        */
+        void setSpecularTransmissionTexture(const Texture::SharedPtr& pTransmission) { setTexture(TextureSlot::SpecularTransmission, pTransmission); }
+
+        /** Get the specular transmission texture
+        */
+        Texture::SharedPtr getSpecularTransmissionTexture() const { return getTexture(TextureSlot::SpecularTransmission); }
 
         /** Set the shading model
         */
@@ -146,19 +204,27 @@ namespace Falcor
 
         /** Set the normal map
         */
-        void setNormalMap(Texture::SharedPtr pNormalMap);
+        void setNormalMap(Texture::SharedPtr pNormalMap) { setTexture(TextureSlot::Normal, pNormalMap); }
 
         /** Get the normal map
         */
-        Texture::SharedPtr getNormalMap() const { return mResources.normalMap; }
+        Texture::SharedPtr getNormalMap() const { return getTexture(TextureSlot::Normal); }
 
         /** Set the occlusion map
         */
-        void setOcclusionMap(Texture::SharedPtr pOcclusionMap);
+        void setOcclusionMap(Texture::SharedPtr pOcclusionMap) { setTexture(TextureSlot::Occlusion, pOcclusionMap); }
 
         /** Get the occlusion map
         */
-        Texture::SharedPtr getOcclusionMap() const { return mResources.occlusionMap; }
+        Texture::SharedPtr getOcclusionMap() const { return getTexture(TextureSlot::Occlusion); }
+
+        /** Set the displacement map
+        */
+        void setDisplacementMap(Texture::SharedPtr pDisplacementMap) { setTexture(TextureSlot::Displacement, pDisplacementMap); }
+
+        /** Get the displacement map
+        */
+        Texture::SharedPtr getDisplacementMap() const { return getTexture(TextureSlot::Displacement); }
 
         /** Set the base color
         */
@@ -175,6 +241,26 @@ namespace Falcor
         /** Get the specular parameters
         */
         const float4& getSpecularParams() const { return mData.specular; }
+
+        /** Set the roughness
+            Only available for metallic/roughness shading model.
+        */
+        void setRoughness(float roughness);
+
+        /** Get the roughness
+            Only available for metallic/roughness shading model.
+        */
+        float getRoughness() const { return getShadingModel() == ShadingModelMetalRough ? mData.specular.g : 0.f; }
+
+        /** Set the metallic value
+            Only available for metallic/roughness shading model.
+        */
+        void setMetallic(float metallic);
+
+        /** Get the metallic value
+            Only available for metallic/roughness shading model.
+        */
+        float getMetallic() const { return getShadingModel() == ShadingModelMetalRough ? mData.specular.b : 0.f; }
 
         /** Set the specular transmission
         */
@@ -248,7 +334,8 @@ namespace Falcor
         */
         void setNestedPriority(uint32_t priority);
 
-        /** Get the nested priority used for nested dielectrics
+        /** Get the nested priority used for nested dielectrics.
+            \return Nested priority, with 0 reserved for the highest possible priority.
         */
         uint32_t getNestedPriority() const { return EXTRACT_NESTED_PRIORITY(mData.flags); }
 
@@ -256,7 +343,8 @@ namespace Falcor
         */
         bool isEmissive() const { return EXTRACT_EMISSIVE_TYPE(mData.flags) != ChannelTypeUnused; }
 
-        /** Comparison operator
+        /** Comparison operator.
+            \return True if all materials properties *except* the name are identical.
         */
         bool operator==(const Material& other) const;
 
@@ -276,6 +364,18 @@ namespace Falcor
         */
         const MaterialResources& getResources() const { return mResources; }
 
+        /** Set the material texture transform.
+        */
+        void setTextureTransform(const Transform& texTransform);
+
+        /** Get a reference to the material texture transform.
+        */
+        Transform& getTextureTransform() { return mTextureTransform; }
+
+        /** Get the material texture transform.
+        */
+        const Transform& getTextureTransform() const { return mTextureTransform; }
+
     private:
         void markUpdates(UpdateFlags updates);
 
@@ -283,12 +383,17 @@ namespace Falcor
         void updateBaseColorType();
         void updateSpecularType();
         void updateEmissiveType();
+        void updateSpecularTransmissionType();
+        void updateAlphaMode();
+        void updateNormalMapMode();
         void updateOcclusionFlag();
+        void updateDisplacementFlag();
 
         Material(const std::string& name);
         std::string mName;
         MaterialData mData;
         MaterialResources mResources;
+        Transform mTextureTransform;
         bool mOcclusionMapEnabled = false;
         mutable UpdateFlags mUpdates = UpdateFlags::None;
         static UpdateFlags sGlobalUpdates;

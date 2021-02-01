@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -37,14 +37,12 @@ namespace Falcor
     /** Low-level buffer object
         This class abstracts the API's buffer creation and management
     */
-    class dlldecl Buffer : public Resource, public inherit_shared_from_this<Resource, Buffer>
+    class dlldecl Buffer : public Resource
     {
     public:
         using SharedPtr = std::shared_ptr<Buffer>;
         using WeakPtr = std::weak_ptr<Buffer>;
         using SharedConstPtr = std::shared_ptr<const Buffer>;
-        using ConstSharedPtrRef = const SharedPtr&;
-        using inherit_shared_from_this<Resource, Buffer>::shared_from_this;
 
         /** Buffer access flags.
             These flags are hints the driver how the buffer will be used.
@@ -194,6 +192,26 @@ namespace Falcor
         */
         virtual UnorderedAccessView::SharedPtr getUAV() override;
 
+#if _ENABLE_CUDA
+        /** Get the CUDA device address for this resource.
+            \return CUDA device address.
+            Throws an exception if the buffer is not shared.
+        */
+        virtual void* getCUDADeviceAddress() const override;
+
+        /** Get the CUDA device address for a view of this resource.
+        */
+        virtual void* getCUDADeviceAddress(ResourceViewInfo const& viewInfo) const override;
+#endif
+
+        /** Get the size of each element in this buffer.
+
+            For a typed buffer, this will be the size of the format.
+            For a structured buffer, this will be the same value as `getStructSize()`.
+            For a raw buffer, this will be the number of bytes.
+        */
+        uint32_t getElementSize() const;
+
         /** Get a constant buffer view
         */
         ConstantBufferView::SharedPtr getCBV();
@@ -218,11 +236,11 @@ namespace Falcor
         */
         size_t getSize() const { return mSize; }
 
-        /** Get the element count. For structured-buffers, this is the number of structs. For typed-buffers, this is the number of elements. For other buffer, will return 0
+        /** Get the element count. For structured-buffers, this is the number of structs. For typed-buffers, this is the number of elements. For other buffer, will return the size in bytes.
         */
         uint32_t getElementCount() const { return mElementCount; }
 
-        /** Get the size of a single struct. This call is only valid for structued-buffer. For other buffer types, it will return 0
+        /** Get the size of a single struct. This call is only valid for structured-buffer. For other buffer types, it will return 0
         */
         uint32_t getStructSize() const { return mStructSize; }
 
@@ -232,7 +250,7 @@ namespace Falcor
 
         /** Get the UAV counter buffer
         */
-        Buffer::ConstSharedPtrRef getUAVCounter() const { return mpUAVCounter; }
+        const Buffer::SharedPtr& getUAVCounter() const { return mpUAVCounter; }
 
         /** Map the buffer.
 
@@ -297,6 +315,9 @@ namespace Falcor
         uint32_t mStructSize = 0;
         ConstantBufferView::SharedPtr mpCBV; // For constant-buffers
         Buffer::SharedPtr mpUAVCounter; // For structured-buffers
+
+        mutable void* mCUDAExternalMemory = nullptr;
+        mutable void* mCUDADeviceAddress = nullptr;
 
         /** Helper for converting host type to resource format for typed buffers.
             See list of supported formats for typed UAV loads:

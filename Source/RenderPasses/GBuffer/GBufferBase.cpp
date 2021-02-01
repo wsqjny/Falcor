@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -28,6 +28,7 @@
 #include "GBufferBase.h"
 #include "GBuffer/GBufferRaster.h"
 #include "GBuffer/GBufferRT.h"
+#include "GBuffer/GBufferRTCurves.h"
 #include "VBuffer/VBufferRaster.h"
 #include "VBuffer/VBufferRT.h"
 
@@ -41,6 +42,7 @@ extern "C" __declspec(dllexport) void getPasses(Falcor::RenderPassLibrary& lib)
 {
     lib.registerClass("GBufferRaster", GBufferRaster::kDesc, GBufferRaster::create);
     lib.registerClass("GBufferRT", GBufferRT::kDesc, GBufferRT::create);
+    lib.registerClass("GBufferRTCurves", GBufferRTCurves::kDesc, GBufferRTCurves::create);
     lib.registerClass("VBufferRaster", VBufferRaster::kDesc, VBufferRaster::create);
     lib.registerClass("VBufferRT", VBufferRT::kDesc, VBufferRT::create);
 
@@ -48,13 +50,13 @@ extern "C" __declspec(dllexport) void getPasses(Falcor::RenderPassLibrary& lib)
     Falcor::ScriptBindings::registerBinding(GBufferRT::registerBindings);
 }
 
-void GBufferBase::registerBindings(ScriptBindings::Module& m)
+void GBufferBase::registerBindings(pybind11::module& m)
 {
-    auto e = m.enum_<GBufferBase::SamplePattern>("SamplePattern");
-    e.regEnumVal(GBufferBase::SamplePattern::Center);
-    e.regEnumVal(GBufferBase::SamplePattern::DirectX);
-    e.regEnumVal(GBufferBase::SamplePattern::Halton);
-    e.regEnumVal(GBufferBase::SamplePattern::Stratified);
+    pybind11::enum_<GBufferBase::SamplePattern> samplePattern(m, "SamplePattern");
+    samplePattern.value("Center", GBufferBase::SamplePattern::Center);
+    samplePattern.value("DirectX", GBufferBase::SamplePattern::DirectX);
+    samplePattern.value("Halton", GBufferBase::SamplePattern::Halton);
+    samplePattern.value("Stratified", GBufferBase::SamplePattern::Stratified);
 }
 
 namespace
@@ -63,6 +65,7 @@ namespace
     const char kSamplePattern[] = "samplePattern";
     const char kSampleCount[] = "sampleCount";
     const char kDisableAlphaTest[] = "disableAlphaTest";
+    const char kAdjustShadingNormals[] = "adjustShadingNormals";
 
     // UI variables.
     const Gui::DropdownList kSamplePatternList =
@@ -76,11 +79,12 @@ namespace
 
 void GBufferBase::parseDictionary(const Dictionary& dict)
 {
-    for (const auto& v : dict)
+    for (const auto& [key, value] : dict)
     {
-        if (v.key() == kSamplePattern) mSamplePattern = (SamplePattern)v.val();
-        else if (v.key() == kSampleCount) mSampleCount = v.val();
-        else if (v.key() == kDisableAlphaTest) mDisableAlphaTest = v.val();
+        if (key == kSamplePattern) mSamplePattern = value;
+        else if (key == kSampleCount) mSampleCount = value;
+        else if (key == kDisableAlphaTest) mDisableAlphaTest = value;
+        else if (key == kAdjustShadingNormals) mAdjustShadingNormals = value;
         // TODO: Check for unparsed fields, including those parsed in derived classes.
     }
 }
@@ -91,6 +95,7 @@ Dictionary GBufferBase::getScriptingDictionary()
     dict[kSamplePattern] = mSamplePattern;
     dict[kSampleCount] = mSampleCount;
     dict[kDisableAlphaTest] = mDisableAlphaTest;
+    dict[kAdjustShadingNormals] = mAdjustShadingNormals;
     return dict;
 }
 
@@ -113,6 +118,9 @@ void GBufferBase::renderUI(Gui::Widgets& widget)
     }
 
     mOptionsChanged |=  widget.checkbox("Disable Alpha Test", mDisableAlphaTest);
+
+    mOptionsChanged |= widget.checkbox("Adjust shading normals", mAdjustShadingNormals);
+    widget.tooltip("Enables adjustment of the shading normals to reduce the risk of black pixels due to back-facing vectors.", true);
 }
 
 void GBufferBase::compile(RenderContext* pContext, const CompileData& compileData)
@@ -127,10 +135,40 @@ void GBufferBase::compile(RenderContext* pContext, const CompileData& compileDat
     }
 }
 
+void GBufferBase::execute(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    // Update refresh flag if options that affect the output have changed.
+    auto& dict = renderData.getDictionary();
+    if (mOptionsChanged)
+    {
+        auto flags = dict.getValue(kRenderPassRefreshFlags, RenderPassRefreshFlags::None);
+        dict[Falcor::kRenderPassRefreshFlags] = flags | Falcor::RenderPassRefreshFlags::RenderOptionsChanged;
+        mOptionsChanged = false;
+    }
+
+    // Pass flag for adjust shading normals to subsequent passes via the dictionary.
+    // Adjusted shading normals cannot be passed via the VBuffer, so this flag allows consuming passes to compute them when enabled.
+    dict[Falcor::kRenderPassGBufferAdjustShadingNormals] = mAdjustShadingNormals;
+
+    // Setup camera with sample generator.
+    if (mpScene) mpScene->getCamera()->setPatternGenerator(mpSampleGenerator, mInvFrameDim);
+}
+
 void GBufferBase::setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene)
 {
     mpScene = pScene;
     updateSamplePattern();
+
+    if (pScene)
+    {
+        // Trigger graph recompilation if we need to change the V-buffer format.
+        ResourceFormat format = pScene->getHitInfo().getFormat();
+        if (format != mVBufferFormat)
+        {
+            mVBufferFormat = format;
+            mPassChangedCB();
+        }
+    }
 }
 
 static CPUSampleGenerator::SharedPtr createSamplePattern(GBufferBase::SamplePattern type, uint32_t sampleCount)
@@ -153,10 +191,6 @@ static CPUSampleGenerator::SharedPtr createSamplePattern(GBufferBase::SamplePatt
 
 void GBufferBase::updateSamplePattern()
 {
-    if (mpScene)
-    {
-        auto pGen = createSamplePattern(mSamplePattern, mSampleCount);
-        if (pGen) mSampleCount = pGen->getSampleCount();
-        mpScene->getCamera()->setPatternGenerator(pGen, mInvFrameDim);
-    }
+    mpSampleGenerator = createSamplePattern(mSamplePattern, mSampleCount);
+    if (mpSampleGenerator) mSampleCount = mpSampleGenerator->getSampleCount();
 }

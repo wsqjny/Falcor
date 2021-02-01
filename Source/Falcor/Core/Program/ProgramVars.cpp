@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -328,4 +328,12 @@ namespace Falcor
     {
         return applyProgramVarsCommon<true>(this, pContext, bindRootSig, pRootSignature);
     }
+
+    void ComputeVars::dispatchCompute(ComputeContext* pContext, uint3 const& threadGroupCount)
+    {
+        auto pProgram = std::dynamic_pointer_cast<ComputeProgram>(getReflection()->getProgramVersion()->getProgram());
+        assert(pProgram);
+        pProgram->dispatchCompute(pContext, this, threadGroupCount);
+    }
+
 }

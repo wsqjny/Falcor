@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -135,6 +135,7 @@ namespace Falcor
         size_t getFieldCount() const { return mFields.size(); }
         const Field* getField(size_t f) const { return f <= mFields.size() ? &mFields[f] : nullptr; }
         const Field* getField(const std::string& name) const;
+        Field* getField(const std::string& name);
         Field& addField(const Field& field);
 
         bool operator==(const RenderPassReflection& other) const;

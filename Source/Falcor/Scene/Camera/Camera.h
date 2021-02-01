@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,8 +27,10 @@
  **************************************************************************/
 #pragma once
 #include "CameraData.slang"
+#include "Scene/Animation/Animatable.h"
 #include "Utils/SampleGenerators/CPUSampleGenerator.h"
 #include "Core/BufferTypes/ParameterBlock.h"
+#include "Utils/Math/AABB.h"
 
 namespace Falcor
 {
@@ -38,20 +40,19 @@ namespace Falcor
 
     /** Camera class. Default transform matrices are interpreted as left eye transform during stereo rendering.
     */
-    class dlldecl Camera
+    class dlldecl Camera : public Animatable
     {
     public:
         using SharedPtr = std::shared_ptr<Camera>;
         using SharedConstPtr = std::shared_ptr<const Camera>;
-        using ConstSharedPtrRef = const SharedPtr&;
 
         // Default dimensions of full frame cameras and 35mm film
         static const float kDefaultFrameHeight;
 
         /** Create a new camera object.
         */
-        static SharedPtr create();
-        ~Camera();
+        static SharedPtr create(const std::string& name = "");
+        ~Camera() = default;
 
         /** Name the camera.
         */
@@ -79,11 +80,19 @@ namespace Falcor
 
         /** Set the camera's film plane height in mm.
         */
-        void setFrameHeight(float height) { mData.frameHeight = height; mDirty = true; }
+        void setFrameHeight(float height) { mData.frameHeight = height; mPreserveHeight = true;  mDirty = true; }
 
         /** Get the camera's film plane height in mm.
         */
         float getFrameHeight() const { return mData.frameHeight; }
+
+        /** Set the camera's film plane width in mm.
+        */
+        void setFrameWidth(float width) { mData.frameWidth = width; mPreserveHeight = false;  mDirty = true; }
+
+        /** Get the camera's film plane width in mm.
+        */
+        float getFrameWidth() const { return mData.frameWidth; }
 
         /** Set the camera's focal distance in scene units.  Used for depth-of-field.
         */
@@ -187,6 +196,10 @@ namespace Falcor
         */
         const glm::mat4& getViewMatrix() const;
 
+        /** Get the previous frame view matrix, which possibly includes the previous frame's camera jitter.
+        */
+        const glm::mat4& getPrevViewMatrix() const;
+
         /** Get the projection matrix.
         */
         const glm::mat4& getProjMatrix() const;
@@ -216,7 +229,7 @@ namespace Falcor
         /** Check if an object should be culled
             \param[in] box Bounding box of the object to check
         */
-        bool isObjectCulled(const BoundingBox& box) const;
+        bool isObjectCulled(const AABB& box) const;
 
         /** Set the camera into a shader var
         */
@@ -226,15 +239,11 @@ namespace Falcor
         */
         const CameraData& getData() const { calculateCameraParameters(); return  mData; }
 
-        /** Set transform matrices for the right eye
-            \param[in] view Right eye view matrix
-            \param[in] proj Right eye projection matrix
-        */
-        void setRightEyeMatrices(const glm::mat4& view, const glm::mat4& proj);
+        void updateFromAnimation(const glm::mat4& transform) override;
 
         /** Render the UI
         */
-        void renderUI(Gui* pGui, const char* uiGroup = nullptr);
+        void renderUI(Gui::Widgets& widget);
 
         enum class Changes
         {
@@ -248,7 +257,6 @@ namespace Falcor
             History         = 0x40, ///< The previous frame matrix changed. This indicates that the camera motion-vectors changed
         };
 
-
         /** Begin frame. Should be called once at the start of each frame.
             This is where we store the previous frame matrices.
             \param[in] firstFrame Set to true on the first frame or after switching cameras.
@@ -259,8 +267,10 @@ namespace Falcor
         */
         Changes getChanges() const { return mChanges; }
 
+        std::string getScript(const std::string& cameraVar);
+
     private:
-        Camera();
+        Camera(const std::string& name);
         Changes mChanges = Changes::None;
 
         mutable bool mDirty = true;
@@ -270,6 +280,7 @@ namespace Falcor
         mutable glm::mat4 mPersistentViewMat;
 
         std::string mName;
+        bool mPreserveHeight = true;    ///< If true, preserve frame height on change of aspect ratio. Otherwise, preserve width.
 
         void calculateCameraParameters() const;
         mutable CameraData mData;
@@ -289,6 +300,8 @@ namespace Falcor
         } mJitterPattern;
 
         void setJitterInternal(float jitterX, float jitterY);
+
+        friend class SceneBuilder;
     };
 
     enum_class_operators(Camera::Changes);

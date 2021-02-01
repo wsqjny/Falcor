@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -25,7 +25,6 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#pragma once
 #include "ComparisonPass.h"
 
 namespace
@@ -108,16 +107,17 @@ void ComparisonPass::execute(RenderContext* pContext, const RenderData& renderDa
     // Render some labels
     if (mShowLabels)
     {
-        int32_t screenLoc = int32_t(mSplitLoc * renderData.getDefaultTextureDims().x);
+        const int32_t screenLocX = int32_t(mSplitLoc * renderData.getDefaultTextureDims().x);
+        const int32_t screenLocY = int32_t(renderData.getDefaultTextureDims().y - 32);
 
         // Draw text labeling the right side image
         std::string rightSide = mSwapSides ? mLeftLabel : mRightLabel;
-        TextRenderer::render(pContext, rightSide.c_str(), pDstFbo, float2(screenLoc + 16, 16));
+        TextRenderer::render(pContext, rightSide, pDstFbo, float2(screenLocX + 16, screenLocY));
 
         // Draw text labeling the left side image
         std::string leftSide = mSwapSides ? mRightLabel : mLeftLabel;
         uint32_t leftLength = uint32_t(leftSide.length()) * 9;
-        TextRenderer::render(pContext, leftSide.c_str(), pDstFbo, float2(screenLoc - 16 - leftLength, 16));
+        TextRenderer::render(pContext, leftSide, pDstFbo, float2(screenLocX - 16 - leftLength, screenLocY));
     }
 }
 

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -36,7 +36,20 @@ namespace Falcor
     {
     public:
         using SharedPtr = std::shared_ptr<Animation>;
-        using ConstSharedPtrRef = const SharedPtr&;
+
+        enum class InterpolationMode
+        {
+            Linear,
+            Hermite,
+        };
+
+        enum class Behavior
+        {
+            Constant,
+            Linear,
+            Cycle,
+            Oscillate,
+        };
 
         struct Keyframe
         {
@@ -46,64 +59,104 @@ namespace Falcor
             glm::quat rotation = glm::quat(1, 0, 0, 0);
         };
 
-        /** Create a new object
+        /** Create a new animation.
+            \param[in] name Animation name.
+            \param[in] nodeID ID of the animated node.
+            \param[in] Animation duration in seconds.
+            \return Returns a new animation.
         */
-        static SharedPtr create(const std::string& name, double durationInSeconds);
+        static SharedPtr create(const std::string& name, uint32_t nodeID, double duration);
 
-        /** Get the animation's name
+        /** Get the animation name.
         */
         const std::string& getName() const { return mName; }
 
-        /** Add a new channel
+        /** Get the animated node.
         */
-        size_t addChannel(size_t matrixID);
+        uint32_t getNodeID() const { return mNodeID; }
 
-        /** Get the channel count
+        /** Get the animation duration in seconds.
         */
-        size_t getChannelCount() const { return mChannels.size(); }
+        double getDuration() const { return mDuration; }
+
+        /** Get the animation's behavior before the first keyframe.
+        */
+        Behavior getPreInfinityBehavior() const { return mPreInfinityBehavior; }
+
+        /** Set the animation's behavior before the first keyframe.
+        */
+        void setPreInfinityBehavior(Behavior behavior) { mPreInfinityBehavior = behavior; }
+
+        /** Get the animation's behavior after the last keyframe.
+        */
+        Behavior getPostInfinityBehavior() const { return mPostInfinityBehavior; }
+
+        /** Set the animation's behavior after the last keyframe.
+        */
+        void setPostInfinityBehavior(Behavior behavior) { mPostInfinityBehavior = behavior; }
+
+        /** Get the interpolation mode.
+        */
+        InterpolationMode getInterpolationMode() const { return mInterpolationMode; }
+
+        /** Set the interpolation mode.
+        */
+        void setInterpolationMode(InterpolationMode interpolationMode) { mInterpolationMode = interpolationMode; }
+
+        /** Return true if warping is enabled.
+        */
+        bool isWarpingEnabled() const { return mEnableWarping; }
+
+        /** Enable/disable warping.
+        */
+        void setEnableWarping(bool enableWarping) { mEnableWarping = enableWarping; }
 
         /** Add a keyframe.
-            If there's already a keyframe at the requested time, this call will override the existing frame
+            If there's already a keyframe at the requested time, this call will override the existing frame.
+            \param[in] keyframe Keyframe.
         */
-        void addKeyframe(size_t channelID, const Keyframe& keyframe);
+        void addKeyframe(const Keyframe& keyframe);
 
-        /** Get the keyframe from a specific time.
-            If the keyframe doesn't exists, the function will throw an exception. If you don't want to handle exceptions, call doesKeyframeExist() first
+        /** Get the keyframe at the specified time.
+            If the keyframe doesn't exists, the function will throw an exception. If you don't want to handle exceptions, call doesKeyframeExist() first.
+            \param[in] time Time of the keyframe.
+            \return Returns the keyframe.
         */
-        const Keyframe& getKeyframe(size_t channelID, double time) const;
+        const Keyframe& getKeyframe(double time) const;
 
-        /** Check if a keyframe exists in a specific time
+        /** Check if a keyframe exists at the specified time.
+            \param[in] time Time of the keyframe.
+            \return Returns true if keyframe exists.
         */
-        bool doesKeyframeExists(size_t channelID, double time) const;
+        bool doesKeyframeExists(double time) const;
 
-        /** Run the animation
-            \param currentTime The current time in seconds. This can be larger then the animation time, in which case the animation will loop
-            \param matrices The array of global matrices to update
+        /** Compute the animation.
+            \param time The current time in seconds. This can be larger then the animation time, in which case the animation will loop.
+            \return Returns the animation's transform matrix for the specified time.
         */
-        void animate(double currentTime, std::vector<glm::mat4>& matrices);
+        glm::mat4 animate(double currentTime);
 
-        /** Get the matrixID affected by a channel
+        /* Render the UI.
         */
-        size_t getChannelMatrixID(size_t channel) const { return mChannels[channel].matrixID; }
+        void renderUI(Gui::Widgets& widget);
 
     private:
-        Animation(const std::string& name, double durationInSeconds);
+        Animation(const std::string& name, uint32_t nodeID, double duration);
 
-        struct Channel
-        {
-            Channel(size_t matID) : matrixID(matID) {};
-            size_t matrixID;
-            std::vector<Keyframe> keyframes;
-            size_t lastKeyframeUsed = 0;
-            double lastUpdateTime = 0;
-        };
+        Keyframe interpolate(InterpolationMode mode, double time) const;
+        double calcSampleTime(double currentTime);
 
-        std::vector<Channel> mChannels;
         const std::string mName;
-        double mDurationInSeconds = 0;
+        uint32_t mNodeID;
+        double mDuration; // Includes any time before the first keyframe. May be Assimp or FBX specific.
 
-        glm::mat4 animateChannel(Channel& c, double time);
-        size_t findChannelFrame(const Channel& c, double time) const;
-        glm::mat4 interpolate(const Keyframe& start, const Keyframe& end, double curTime) const;
+        Behavior mPreInfinityBehavior = Behavior::Constant; // How the animation behaves before the first keyframe
+        Behavior mPostInfinityBehavior = Behavior::Constant; // How the animation behaves after the last keyframe
+
+        InterpolationMode mInterpolationMode = InterpolationMode::Linear;
+        bool mEnableWarping = false;
+
+        std::vector<Keyframe> mKeyframes;
+        mutable size_t mCachedFrameIndex = 0;
     };
 }

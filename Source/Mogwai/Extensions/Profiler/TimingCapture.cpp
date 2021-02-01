@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -32,7 +32,7 @@ namespace Mogwai
 {
     namespace
     {
-        const std::string kScriptVar = "tc";
+        const std::string kScriptVar = "timingCapture";
         const std::string kCaptureFrameTime = "captureFrameTime";
     }
 
@@ -40,17 +40,20 @@ namespace Mogwai
 
     TimingCapture::UniquePtr TimingCapture::create(Renderer* pRenderer)
     {
-        return UniquePtr(new TimingCapture());
+        return UniquePtr(new TimingCapture(pRenderer));
     }
 
-    void TimingCapture::scriptBindings(Bindings& bindings)
+    void TimingCapture::registerScriptBindings(pybind11::module& m)
     {
-        auto& m = bindings.getModule();
-        auto c = m.class_<TimingCapture>("TimingCapture");
-        bindings.addGlobalObject(kScriptVar, this, "Timing Capture Helpers");
+        pybind11::class_<TimingCapture> timingCapture(m, "TimingCapture");
 
         // Members
-        c.func_(kCaptureFrameTime.c_str(), &TimingCapture::captureFrameTime, "filename"_a);
+        timingCapture.def(kCaptureFrameTime.c_str(), &TimingCapture::captureFrameTime, "filename"_a);
+    }
+
+    std::string TimingCapture::getScriptVar() const
+    {
+        return kScriptVar;
     }
 
     void TimingCapture::beginFrame(RenderContext* pRenderContext, const Fbo::SharedPtr& pTargetFbo)

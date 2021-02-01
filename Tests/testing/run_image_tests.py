@@ -89,15 +89,27 @@ class Test:
             print(e)
             sys.exit(1)
 
+        # Get tags.
+        self.tags = self.header.get('tags', ['default'])
+
         # Get skipped tests.
         self.skip_message = self.header.get('skipped', None)
         self.skipped = self.skip_message != None
 
         # Get tolerance.
-        self.tolerance = self.header.get('tolerance', config.TOLERANCE)
+        self.tolerance = self.header.get('tolerance', config.DEFAULT_TOLERANCE)
 
     def __repr__(self):
         return f'Test(name={self.name},script_file={self.script_file})'
+
+    def matches_tags(self, tags):
+        '''
+        Check if the test's tags matches any of the given tags.
+        '''
+        for tag in self.tags:
+            if tag in tags:
+                return True
+        return False
 
     def collect_images(self, image_dir):
         '''
@@ -134,22 +146,28 @@ class Test:
         # Write helper script to run test.
         generate_file = output_dir / 'generate.py'
         with open(generate_file, 'w') as f:
-            f.write(f'fc.outputDir = r"{output_dir}"\n')
+            f.write(f'm.frameCapture.outputDir = r"{output_dir}"\n')
             f.write(f'm.script(r"{relative_to_cwd(self.script_file)}")\n')
 
         # Run Mogwai to generate images.
+        args = [
+            str(mogwai_exe),
+            '--script', str(relative_to_cwd(generate_file)),
+            '--logfile', str(output_dir / 'log.txt'),
+            '--silent'
+        ]
+        p = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            process = helpers.run_with_timeout([
-                mogwai_exe,
-                '-script', relative_to_cwd(generate_file),
-                '-logfile', output_dir / 'log.txt',
-                '-silent'
-            ], cwd=cwd, stderr=subprocess.PIPE, timeout=600)
-            if process.returncode != 0:
-                errors = list(map(lambda l: l.decode('utf-8').rstrip(), process.stderr.readlines()))
-                return Test.Result.FAILED, errors + [f'{mogwai_exe} exited with return code {process.returncode}']
-        except Exception as e:
-            return Test.Result.FAILED, [f'Error running {mogwai_exe}: {e}']
+            outs, errs = p.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            return Test.Result.FAILED, ['Process killed due to timeout']
+
+        # Check for success.
+        if p.returncode != 0:
+            # Generate list of errors from stderr.
+            errors = list(map(lambda l: l.rstrip(), errs.decode('utf-8').splitlines()))
+            return Test.Result.FAILED, errors + [f'{mogwai_exe} exited with return code {p.returncode}']
 
         # Bail out if no images have been generated.
         if len(self.collect_images(output_dir)) == 0:
@@ -361,9 +379,9 @@ def list_tests(tests):
     for test in tests:
         print(f'  {test.name}')
 
-def collect_tests(root_dir, filter_regex):
+def collect_tests(root_dir, filter_regex, tags):
     '''
-    Collect a list of all tests found in root_dir that are matching the filter_regex.
+    Collect a list of all tests found in root_dir that are matching the filter_regex and tags.
     A test script needs to be named test_*.py to be detected.
     '''
     print(root_dir)
@@ -373,9 +391,14 @@ def collect_tests(root_dir, filter_regex):
     # Filter using regex.
     if filter_regex != '':
         regex = re.compile(filter_regex or '')
-        script_files = list(filter(lambda f: regex.search(str(f)) != None, script_files))
+        script_files = list(filter(lambda f: regex.search(str(f.as_posix())) != None, script_files))
 
     tests = list(map(lambda f: Test(f, root_dir), script_files))
+
+    # Filter using tags.
+    tags = tags.split(',')
+    tests = list(filter(lambda t: t.matches_tags(tags), tests))
+
     return tests
 
 def push_refs(ref_dir, remote_ref_dir):
@@ -406,6 +429,7 @@ def main():
     parser.add_argument('-c', '--config', type=str, action='store', help=f'Build configuration: {available_configs}', default=config.DEFAULT_BUILD_CONFIG)
     parser.add_argument('-e', '--environment', type=str, action='store', help='Environment', default=config.DEFAULT_ENVIRONMENT)
     parser.add_argument('-l', '--list', action='store_true', help='List available tests')
+    parser.add_argument('-t', '--tags', type=str, action='store', help='Comma separated list of tags for filtering tests to run', default='default')
     parser.add_argument('-f', '--filter', type=str, action='store', help='Regular expression for filtering tests to run')
     parser.add_argument('-b', '--ref-branch', help='Reference branch to compare against (defaults to master branch)', default='master')
     parser.add_argument('--compare-only', action='store_true', help='Compare previous results against references without generating new images')
@@ -433,7 +457,7 @@ def main():
             sys.exit(1)
 
     # Collect tests to run.
-    tests = collect_tests(env.image_tests_dir, args.filter)
+    tests = collect_tests(env.image_tests_dir, args.filter, args.tags)
 
     if args.list:
         # List available tests.

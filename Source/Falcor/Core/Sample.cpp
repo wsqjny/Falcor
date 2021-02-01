@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -67,6 +67,11 @@ namespace Falcor
         if(mpRenderer) mpRenderer->onResizeSwapChain(width, height);
     }
 
+    void Sample::handleRenderFrame()
+    {
+        renderFrame();
+    }
+
     void Sample::handleKeyboardEvent(const KeyboardEvent& keyEvent)
     {
         if (mSuppressInput)
@@ -99,6 +104,8 @@ namespace Falcor
                 case KeyboardEvent::Key::Space:
                     mRendererPaused = !mRendererPaused;
                     break;
+                default:
+                    break;
                 }
             }
             else if (!keyEvent.mods.isAltDown && !keyEvent.mods.isCtrlDown && !keyEvent.mods.isShiftDown)
@@ -110,7 +117,7 @@ namespace Falcor
                     break;
 #if _PROFILING_ENABLED
                 case KeyboardEvent::Key::P:
-                    gProfileEnabled = !gProfileEnabled;
+                    Profiler::instance().setEnabled(!Profiler::instance().isEnabled());
                     break;
 #endif
                 case KeyboardEvent::Key::V:
@@ -142,6 +149,8 @@ namespace Falcor
                 case KeyboardEvent::Key::Pause:
                 case KeyboardEvent::Key::Space:
                     mClock.isPaused() ? mClock.play() : mClock.pause();
+                    break;
+                default:
                     break;
                 }
             }
@@ -189,7 +198,7 @@ namespace Falcor
         }
         catch (const std::exception & e)
         {
-            logError("Error:\n" + std::string(e.what()));
+            logError("Caught exception:\n\n" + std::string(e.what()) + "\n\nEnable breaking on exceptions in the debugger to get a full stack trace.");
         }
         Logger::shutdown();
     }
@@ -199,7 +208,7 @@ namespace Falcor
         Sample s(pRenderer);
         try
         {
-            auto err = [filename](std::string_view msg) {logError("Error in Sample::Run(). `" + filename + "` " + msg); };
+            auto err = [filename](std::string_view msg) {logError("Error in Sample::Run(). '" + filename + "' " + msg); };
 
             s.startScripting(); // We have to do that before running the script
             std::string fullpath;
@@ -226,7 +235,7 @@ namespace Falcor
         }
         catch (const std::exception & e)
         {
-            logError("Error:\n" + std::string(e.what()));
+            logError("Caught exception:\n\n" + std::string(e.what()) + "\n\nEnable breaking on exceptions in the debugger to get a full stack trace.");
         }
         Logger::shutdown();
     }
@@ -280,16 +289,7 @@ namespace Falcor
 #ifdef _WIN32
         // Set the icon
         setWindowIcon("Framework\\Nvidia.ico", mpWindow->getApiHandle());
-
-        if (argc == 0 || argv == nullptr)
-        {
-            mArgList.parseCommandLine(GetCommandLineA());
-        }
-        else
 #endif
-        {
-            mArgList.parseCommandLine(concatCommandLine(argc, argv));
-        }
 
         // Load and run
         mpRenderer->onLoad(getRenderContext());
@@ -320,7 +320,7 @@ namespace Falcor
             Gui::DropdownList list;
             for (uint32_t i = 0 ; i < count; i++)
             {
-                list.push_back({ i, to_string(resolutions[i].x) + "x" + to_string(resolutions[i].y) });
+                list.push_back({ i, std::to_string(resolutions[i].x) + "x" + std::to_string(resolutions[i].y) });
             }
             list[0] = { 0, "Custom" };
             return list;
@@ -412,7 +412,9 @@ namespace Falcor
     {
         PROFILE("renderUI");
 
-        if (mShowUI || gProfileEnabled)
+        auto& profiler = Profiler::instance();
+
+        if (mShowUI || profiler.isEnabled())
         {
             mpGui->beginFrame();
 
@@ -423,22 +425,26 @@ namespace Falcor
                 mVideoCapture.pUI->render(w);
             }
 
-            if (gProfileEnabled)
+            if (profiler.isEnabled())
             {
                 uint32_t y = gpDevice->getSwapChainFbo()->getHeight() - 360;
 
-                mpGui->setActiveFont(kMonospaceFont);
+                bool open = profiler.isEnabled();
+                Gui::Window profilerWindow(mpGui.get(), "Profiler", open, { 800, 350 }, { 10, y });
+                profiler.endEvent("renderUI"); // Stop the timer
 
-                Gui::Window profilerWindow(mpGui.get(), "Profiler", gProfileEnabled, { 800, 350 }, { 10, y });
-                Profiler::endEvent("renderUI"); // Stop the timer
-
-                if(gProfileEnabled)
+                if (open)
                 {
-                    profilerWindow.text(Profiler::getEventsString().c_str());
-                    Profiler::startEvent("renderUI");
+                    std::string text = profiler.getEventsString();
+                    if (profilerWindow.button("Print to log")) logInfo("\n" + text);
+                    ImGui::PushFont(mpGui->getFont(kMonospaceFont));
+                    profilerWindow.text(text);
+                    ImGui::PopFont();
+                    profiler.startEvent("renderUI");
                     profilerWindow.release();
                 }
-                mpGui->setActiveFont("");
+
+                profiler.setEnabled(open);
             }
 
             mpGui->render(getRenderContext(), gpDevice->getSwapChainFbo(), (float)mFrameRate.getLastFrameTime());
@@ -483,7 +489,7 @@ namespace Falcor
             if (mpPixelZoom) mpPixelZoom->render(pRenderContext, pSwapChainFbo.get());
 
 #if _PROFILING_ENABLED
-            Profiler::endFrame();
+            Profiler::instance().endFrame();
 #endif
             // Capture video frame after UI is rendered
             if (captureVideoUI) captureVideoFrame();
@@ -495,7 +501,7 @@ namespace Falcor
             }
         }
 
-        Console::flush();
+        Console::instance().flush();
     }
 
     std::string Sample::captureScreen(const std::string explicitFilename, const std::string explicitOutputDirectory)
@@ -632,7 +638,7 @@ namespace Falcor
         if (saveFileDialog(Scripting::kFileExtensionFilters, filename))
         {
             SampleConfig c = getConfig();
-            std::string s = "sampleConfig = " + ScriptBindings::to_string(c) + "\n";
+            std::string s = "sampleConfig = " + ScriptBindings::repr(c) + "\n";
             std::ofstream(filename) << s;
         }
     }
@@ -640,27 +646,31 @@ namespace Falcor
     void Sample::startScripting()
     {
         Scripting::start();
-        auto bindFunc = [this](ScriptBindings::Module& m) { this->registerScriptBindings(m); };
+        auto bindFunc = [this](pybind11::module& m) { this->registerScriptBindings(m); };
         ScriptBindings::registerBinding(bindFunc);
     }
 
-    void Sample::registerScriptBindings(ScriptBindings::Module& m)
+    void Sample::registerScriptBindings(pybind11::module& m)
     {
-        auto sampleDesc = m.regClass(SampleConfig);
-#define field(f_) rwField(#f_, &SampleConfig::f_)
-        sampleDesc.field(windowDesc).field(deviceDesc).field(showMessageBoxOnError).field(timeScale);
-        sampleDesc.field(pauseTime).field(showUI);
+        ScriptBindings::SerializableStruct<SampleConfig> sampleConfig(m, "SampleConfig");
+#define field(f_) field(#f_, &SampleConfig::f_)
+        sampleConfig.field(windowDesc);
+        sampleConfig.field(deviceDesc);
+        sampleConfig.field(showMessageBoxOnError);
+        sampleConfig.field(timeScale);
+        sampleConfig.field(pauseTime);
+        sampleConfig.field(showUI);
 #undef field
         auto exit = [](int32_t errorCode) { postQuitMessage(errorCode); };
-        m.func_("exit", exit, "errorCode"_a = 0);
+        m.def("exit", exit, "errorCode"_a = 0);
 
         auto renderFrame = [this]() {ProgressBar::close(); this->renderFrame(); };
-        m.func_("renderFrame", renderFrame);
+        m.def("renderFrame", renderFrame);
 
         auto setWindowPos = [this](int32_t x, int32_t y) {getWindow()->setWindowPos(x, y); };
-        m.func_("setWindowPos", setWindowPos, "x"_a, "y"_a);
+        m.def("setWindowPos", setWindowPos, "x"_a, "y"_a);
 
         auto resize = [this](uint32_t width, uint32_t height) {resizeSwapChain(width, height); };
-        m.func_("resizeSwapChain", resize, "width"_a, "height"_a);
+        m.def("resizeSwapChain", resize, "width"_a, "height"_a);
     }
 }

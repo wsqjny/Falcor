@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -28,6 +28,9 @@
 #include "stdafx.h"
 #include "Mogwai.h"
 #include "MogwaiSettings.h"
+
+#include <args.hxx>
+
 #include <filesystem>
 #include <algorithm>
 
@@ -37,20 +40,19 @@ namespace Mogwai
     {
         std::map<std::string, Extension::CreateFunc>* gExtensions; // Map ensures ordering
 
-        const char* kEditorExecutableName = "RenderGraphEditor";
-        const char* kEditorSwitch = "editor";
-        const char* kOutfileDirSwitch = "outputdir";
-        const char* kScriptSwitch = "script";
-        const char* kGraphFileSwitch = "graphFile";
-        const char* kGraphNameSwitch = "graphName";
+        const std::string kEditorExecutableName = "RenderGraphEditor";
+        const std::string kEditorSwitch = "--editor";
+        const std::string kGraphFileSwitch = "--graph-file";
+        const std::string kGraphNameSwitch = "--graph-name";
 
         const std::string kAppDataPath = getAppDataDirectory() + "/NVIDIA/Falcor/Mogwai.json";
     }
 
     size_t Renderer::DebugWindow::index = 0;
 
-    Renderer::Renderer()
-        : mAppData(kAppDataPath)
+    Renderer::Renderer(const Options& options)
+        : mOptions(options)
+        , mAppData(kAppDataPath)
     {}
 
     void Renderer::extend(Extension::CreateFunc func, const std::string& name)
@@ -74,17 +76,24 @@ namespace Mogwai
     void Renderer::onLoad(RenderContext* pRenderContext)
     {
         mpExtensions.push_back(MogwaiSettings::create(this));
-        if(gExtensions)
+        if (gExtensions)
         {
             for (auto& f : (*gExtensions)) mpExtensions.push_back(f.second(this));
             safe_delete(gExtensions);
         }
 
-        auto regBinding = [this](ScriptBindings::Module& m) {this->registerScriptBindings(m); };
+        auto regBinding = [this](pybind11::module& m) {this->registerScriptBindings(m); };
         ScriptBindings::registerBinding(regBinding);
 
-        // If editor opened from running render graph, get the name of the file to read
-        if (gpFramework->getArgList().argExists(kScriptSwitch)) loadScript(gpFramework->getArgList()[kScriptSwitch].asString());
+        // Load script provided via command line.
+        if (!mOptions.scriptFile.empty())
+        {
+            loadScript(mOptions.scriptFile);
+            // Add script to recent files only if not in silent mode (which is used during image tests).
+            if (!mOptions.silentMode) mAppData.addRecentScript(mOptions.scriptFile);
+        }
+
+        Scene::nullTracePass(pRenderContext, uint2(1024));
     }
 
     RenderGraph* Renderer::getActiveGraph() const
@@ -247,14 +256,14 @@ namespace Mogwai
             loadScript(filename);
             mAppData.addRecentScript(filename);
         }
-        else if (std::any_of(Scene::kFileExtensionFilters.begin(), Scene::kFileExtensionFilters.end(), [&ext](FileDialogFilter f) {return f.ext == ext; }))
+        else if (std::any_of(Scene::getFileExtensionFilters().begin(), Scene::getFileExtensionFilters().end(), [&ext](FileDialogFilter f) {return f.ext == ext; }))
         {
             loadScene(filename);
             mAppData.addRecentScene(filename);
         }
         else
         {
-            logWarning("RenderGraphViewer::onDroppedFile() - Unknown file extension `" + ext + "`");
+            logWarning("RenderGraphViewer::onDroppedFile() - Unknown file extension '" + ext + "'");
         }
     }
 
@@ -278,12 +287,11 @@ namespace Mogwai
         monitorFileUpdates(mEditorTempFile, std::bind(&Renderer::editorFileChangeCB, this));
 
         // Run the process
-        std::string commandLineArgs = '-' + std::string(kEditorSwitch) + " -" + std::string(kGraphFileSwitch);
-        commandLineArgs += ' ' + mEditorTempFile + " -" + std::string(kGraphNameSwitch) + ' ' + mGraphs[mActiveGraph].pGraph->getName();
+        std::string commandLineArgs = kEditorSwitch + " " + kGraphFileSwitch + " " + mEditorTempFile + " " + kGraphNameSwitch + " " + mGraphs[mActiveGraph].pGraph->getName();
         mEditorProcess = executeProcess(kEditorExecutableName, commandLineArgs);
 
         // Mark the output if it's required
-       if (unmarkOut) mGraphs[mActiveGraph].pGraph->markOutput(mGraphs[mActiveGraph].mainOutput);
+        if (unmarkOut) mGraphs[mActiveGraph].pGraph->markOutput(mGraphs[mActiveGraph].mainOutput);
     }
 
     void Renderer::resetEditor()
@@ -326,7 +334,7 @@ namespace Mogwai
     {
         auto pGraph = getGraph(graphName);
         if (pGraph) removeGraph(pGraph);
-        else logError("Can't find a graph named `" + graphName + "`. There's nothing to remove.");
+        else logError("Can't find a graph named '" + graphName + "'. There's nothing to remove.");
     }
 
     RenderGraph::SharedPtr Renderer::getGraph(const std::string& graphName) const
@@ -375,8 +383,8 @@ namespace Mogwai
         std::string filename;
         if (openFileDialog(Scripting::kFileExtensionFilters, filename))
         {
-            mAppData.addRecentScript(filename);
             loadScriptDeferred(filename);
+            mAppData.addRecentScript(filename);
         }
     }
 
@@ -392,12 +400,28 @@ namespace Mogwai
         try
         {
             if (ProgressBar::isActive()) ProgressBar::show("Loading Configuration");
-            auto c = Scripting::getGlobalContext();
-            Scripting::runScriptFromFile(filename, c);
+
+            // Add script directory to search paths (add it to the front to make it highest priority).
+            const std::string directory = getDirectoryFromFile(filename);
+            addDataDirectory(directory, true);
+
+            Scripting::runScriptFromFile(filename);
+
+            removeDataDirectory(directory);
         }
         catch (const std::exception& e)
         {
             logError("Error when loading configuration file: " + filename + "\n" + std::string(e.what()));
+        }
+    }
+
+    void Renderer::saveConfigDialog()
+    {
+        std::string filename;
+        if (saveFileDialog(Scripting::kFileExtensionFilters, filename))
+        {
+            saveConfig(filename);
+            mAppData.addRecentScript(filename);
         }
     }
 
@@ -415,7 +439,7 @@ namespace Mogwai
         {
             if (mGraphs[i].pGraph->getName() == pGraph->getName())
             {
-                logWarning("Replacing existing graph `" + pGraph->getName() + "` with new graph.");
+                logWarning("Replacing existing graph '" + pGraph->getName() + "' with new graph.");
                 pGraphData = &mGraphs[i];
                 break;
             }
@@ -426,19 +450,32 @@ namespace Mogwai
     void Renderer::loadSceneDialog()
     {
         std::string filename;
-        if (openFileDialog(Scene::kFileExtensionFilters, filename))
+        if (openFileDialog(Scene::getFileExtensionFilters(), filename))
         {
-            mAppData.addRecentScene(filename);
             loadScene(filename);
+            mAppData.addRecentScene(filename);
         }
     }
 
     void Renderer::loadScene(std::string filename, SceneBuilder::Flags buildFlags)
     {
-        setScene(SceneBuilder::create(filename, buildFlags)->getScene());
+        TimeReport timeReport;
+
+        SceneBuilder::SharedPtr pBuilder = SceneBuilder::create(filename, buildFlags);
+        if (!pBuilder) return;
+
+        setScene(pBuilder->getScene());
+
+        timeReport.measure("Loading scene (total)");
+        timeReport.printToLog();
     }
 
-    void Renderer::setScene(Scene::ConstSharedPtrRef pScene)
+    void Renderer::unloadScene()
+    {
+        setScene(nullptr);
+    }
+
+    void Renderer::setScene(const Scene::SharedPtr& pScene)
     {
         mpScene = pScene;
 
@@ -482,7 +519,8 @@ namespace Mogwai
         if (hasUnmarkedOut) pActiveGraph->unmarkOutput(mGraphs[mActiveGraph].mainOutput);
 
         // Run the scripting
-        Scripting::getGlobalContext().setObject("g", pActiveGraph);
+        // TODO: Rendergraph scripts should be executed in an isolated scripting context.
+        Scripting::getDefaultContext().setObject("g", pActiveGraph);
         Scripting::runScript(mEditorScript);
 
         // Update the list of marked outputs
@@ -508,7 +546,7 @@ namespace Mogwai
         auto& pGraph = mGraphs[mActiveGraph].pGraph;
 
         // Execute graph.
-        (*pGraph->getPassesDictionary())[kRenderPassRefreshFlags] = (uint32_t)RenderPassRefreshFlags::None;
+        (*pGraph->getPassesDictionary())[kRenderPassRefreshFlags] = RenderPassRefreshFlags::None;
         pGraph->execute(pRenderContext);
     }
 
@@ -531,14 +569,21 @@ namespace Mogwai
             loadScript(s);
         }
 
-        beginFrame(pRenderContext, pTargetFbo);
         applyEditorChanges();
+
+        if (mActiveGraph < mGraphs.size())
+        {
+            auto& pGraph = mGraphs[mActiveGraph].pGraph;
+            pGraph->compile(pRenderContext);
+        }
+
+        beginFrame(pRenderContext, pTargetFbo);
 
         // Clear frame buffer.
         const float4 clearColor(0.38f, 0.52f, 0.10f, 1);
         pRenderContext->clearFbo(pTargetFbo.get(), clearColor, 1.0f, 0, FboAttachmentType::All);
 
-        if (mGraphs.size())
+        if (mActiveGraph < mGraphs.size())
         {
             auto& pGraph = mGraphs[mActiveGraph].pGraph;
 
@@ -612,36 +657,81 @@ namespace Mogwai
 
     std::string Renderer::getVersionString()
     {
-        return "Mogwai " + to_string(kMajorVersion) + "." + to_string(kMinorVersion);
+        return "Mogwai " + std::to_string(kMajorVersion) + "." + std::to_string(kMinorVersion);
     }
 }
 
-#ifdef _WIN32
-int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
-#else
 int main(int argc, char** argv)
-#endif
 {
+    args::ArgumentParser parser("Mogwai render application.");
+    parser.helpParams.programName = "Mogwai";
+    args::HelpFlag helpFlag(parser, "help", "Display this help menu.", {'h', "help"});
+    args::ValueFlag<std::string> scriptFlag(parser, "path", "Python script file to run.", {'s', "script"});
+    args::ValueFlag<std::string> logfileFlag(parser, "path", "File to write log into.", {'l', "logfile"});
+    args::ValueFlag<int32_t> verbosityFlag(parser, "verbosity", "Logging verbosity (0=disabled, 1=fatal errors, 2=errors, 3=warnings, 4=infos, 5=debugging)", { 'v', "verbosity" }, 4);
+    args::Flag silentFlag(parser, "", "Starts Mogwai with a minimized window and disables mouse/keyboard input as well as error message dialogs.", {"silent"});
+    args::ValueFlag<uint32_t> widthFlag(parser, "pixels", "Initial window width.", {"width"});
+    args::ValueFlag<uint32_t> heightFlag(parser, "pixels", "Initial window height.", {"height"});
+    args::CompletionFlag completionFlag(parser, {"complete"});
+
+    try
+    {
+        parser.ParseCLI(argc, argv);
+    }
+    catch (const args::Completion& e)
+    {
+        std::cout << e.what();
+        return 0;
+    }
+    catch (const args::Help&)
+    {
+        std::cout << parser;
+        return 0;
+    }
+    catch (const args::ParseError& e)
+    {
+        std::cerr << e.what() << std::endl;
+        std::cerr << parser;
+        return 1;
+    }
+    catch (const args::RequiredError& e)
+    {
+        std::cerr << e.what() << std::endl;
+        std::cerr << parser;
+        return 1;
+    }
+
+    int32_t verbosity = args::get(verbosityFlag);
+
+    if (verbosity < 0 || verbosity >= (int32_t)Logger::Level::Count)
+    {
+        std::cerr << argv[0] << ": invalid verbosity level " << verbosity << std::endl;
+        return 1;
+    }
+
+    Logger::setVerbosity((Logger::Level)verbosity);
+    Logger::logToConsole(true);
+
+    if (logfileFlag)
+    {
+        std::string logfile = args::get(logfileFlag);
+        Logger::setLogFilePath(logfile);
+    }
+
+    Mogwai::Renderer::Options options;
+
+    if (scriptFlag) options.scriptFile = args::get(scriptFlag);
+    if (silentFlag) options.silentMode = true;
+
     try
     {
         msgBoxTitle("Mogwai");
 
-        IRenderer::UniquePtr pRenderer = std::make_unique<Mogwai::Renderer>();
+        IRenderer::UniquePtr pRenderer = std::make_unique<Mogwai::Renderer>(options);
         SampleConfig config;
         config.windowDesc.title = "Mogwai";
 
-        ArgList args;
-#ifdef _WIN32
-        args.parseCommandLine(GetCommandLineA());
-        int argc = 0;
-        char** argv = nullptr;
-#else
-        args.parseCommandLine(argc, argv);
-        config.argc = argc;
-        config.argv = argv;
-#endif
-
-        if (args.argExists("silent"))
+        if (silentFlag)
         {
             config.suppressInput = true;
             config.showMessageBoxOnError = false;
@@ -651,13 +741,10 @@ int main(int argc, char** argv)
             Logger::showBoxOnError(false);
         }
 
-        if (args.argExists("logfile"))
-        {
-            auto values = args.getValues("logfile");
-            if (!values.empty()) Logger::setLogFilePath(values.front().asString());
-        }
+        if (widthFlag) config.windowDesc.width = args::get(widthFlag);
+        if (heightFlag) config.windowDesc.height = args::get(heightFlag);
 
-        Sample::run(config, pRenderer, argc, argv);
+        Sample::run(config, pRenderer, 0, nullptr);
     }
     catch (const std::exception& e)
     {

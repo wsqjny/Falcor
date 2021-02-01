@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -136,7 +136,7 @@ namespace Falcor
     */
     dlldecl void msgBoxTitle(const std::string& title);
 
-    /** Finds a file in one of the media directories. The arguments must not alias.
+    /** Finds a file in one of the data search directories. The arguments must not alias.
         \param[in] filename The file to look for
         \param[in] fullPath If the file was found, the full path to the file. If the file wasn't found, this is invalid.
         \return true if the file was found, otherwise false
@@ -192,7 +192,7 @@ namespace Falcor
     */
     dlldecl bool chooseFolderDialog(std::string& folder);
 
-    /** Checks if a file exists in the file system. This function doesn't look in the common directories.
+    /** Checks if a file exists in the file system. This function doesn't look in the search directories.
         \param[in] filename The file to look for
         \return true if the file was found, otherwise false
     */
@@ -215,7 +215,7 @@ namespace Falcor
     */
     dlldecl void closeSharedFile(const std::string& filePath);
 
-    /** Creates a file in the temperary directory and returns the path.
+    /** Creates a file in the temporary directory and returns the path.
         \return pathName Absolute path to unique temp file.
     */
     dlldecl std::string getTempFilename();
@@ -265,13 +265,14 @@ namespace Falcor
     */
     dlldecl const std::vector<std::string>& getDataDirectoriesList();
 
-    /** Adds a folder into the search directory. Once added, calls to FindFileInCommonDirs() will seach that directory as well
-        \param[in] dir The new directory to add to the common directories.
+    /** Adds a folder to data search directories. Once added, calls to findFileInDataDirectories() will search that directory as well.
+        \param[in] dir The new directory to add to the data search directories.
+        \param[in] addToFront Add the new directory to the front of the list, making it the highest priority.
     */
-    dlldecl void addDataDirectory(const std::string& dir);
+    dlldecl void addDataDirectory(const std::string& dir, bool addToFront = false);
 
-    /** Removes a folder from the search directories
-        \param[in] dir The directory name to remove from the common directories.
+    /** Removes a folder from the data search directories
+        \param[in] dir The directory name to remove from the data search directories.
     */
     dlldecl void removeDataDirectory(const std::string& dir);
 

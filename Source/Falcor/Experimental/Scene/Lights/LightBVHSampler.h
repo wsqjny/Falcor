@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -26,7 +26,7 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 #pragma once
-#include "Utils/Math/BBox.h"
+#include "Utils/Math/AABB.h"
 #include "EmissiveLightSampler.h"
 #include "LightBVH.h"
 #include "LightBVHBuilder.h"
@@ -46,7 +46,7 @@ namespace Falcor
         This class wraps a LightCollection object, which holds the set of lights to sample.
         Internally, the class build a BVH over the light sources.
     */
-    class dlldecl LightBVHSampler : public EmissiveLightSampler, public inherit_shared_from_this<EmissiveLightSampler, LightBVHSampler>
+    class dlldecl LightBVHSampler : public EmissiveLightSampler
     {
     public:
         using SharedPtr = std::shared_ptr<LightBVHSampler>;
@@ -55,7 +55,7 @@ namespace Falcor
         /** LightBVHSampler configuration.
             Note if you change options, please update SCRIPT_BINDING in LightBVHSampler.cpp
         */
-        struct Options : Falcor::ScriptBindings::enable_to_string
+        struct Options
         {
             // Build options
             LightBVHBuilder::Options buildOptions;
@@ -66,7 +66,7 @@ namespace Falcor
             bool        disableNodeFlux = false;            ///< Do not take per-node flux into account in sampling.
             bool        useUniformTriangleSampling = true;  ///< Use uniform sampling to select a triangle within the sampled leaf node.
 
-            SolidAngleBoundMethod solidAngleBoundMethod = SolidAngleBoundMethod::BoxToAverage; ///< Method to use to bound the solid angle subtended by a cluster.
+            SolidAngleBoundMethod solidAngleBoundMethod = SolidAngleBoundMethod::Sphere; ///< Method to use to bound the solid angle subtended by a cluster.
         };
 
         virtual ~LightBVHSampler() = default;
@@ -84,13 +84,10 @@ namespace Falcor
         */
         virtual bool update(RenderContext* pRenderContext) override;
 
-        /** Add compile-time specialization to program to use this light sampler.
-            This function must be called every frame before the sampler is bound.
-            Note that ProgramVars may need to be re-created after this call, check the return value.
-            \param[in] pProgram The Program to add compile-time specialization to.
-            \return True if the ProgramVars needs to be re-created.
+        /** Return a list of shader defines to use this light sampler.
+        *   \return Returns a list of shader defines.
         */
-        virtual bool prepareProgram(Program* pProgram) const override;
+        virtual Program::DefineList getDefines() const override;
 
         /** Bind the light sampler data to a given shader variable.
             \param[in] var Shader variable.

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -32,7 +32,7 @@ namespace Mogwai
 {
     namespace
     {
-        const std::string kScriptVar = "vc";
+        const std::string kScriptVar = "videoCapture";
         const std::string kUI = "ui";
         const std::string kCodec = "codec";
         const std::string kFps = "fps";
@@ -52,7 +52,7 @@ namespace Mogwai
 
     MOGWAI_EXTENSION(VideoCapture);
 
-    VideoCapture::VideoCapture(Renderer* pRenderer) : CaptureTrigger(pRenderer)
+    VideoCapture::VideoCapture(Renderer* pRenderer) : CaptureTrigger(pRenderer, "Video Capture")
     {
         mpEncoderUI = VideoEncoderUI::create();
     }
@@ -104,7 +104,7 @@ namespace Mogwai
             d.height = pTex->getHeight();
             d.width = pTex->getWidth();
             d.format = pTex->getFormat();
-            d.filename = getOutputNamePrefix(outputName) + to_string(r.first) + "." + to_string(r.second) + "." + VideoEncoder::getSupportedContainerForCodec(d.codec)[0].ext;
+            d.filename = getOutputNamePrefix(outputName) + std::to_string(r.first) + "." + std::to_string(r.second) + "." + VideoEncoder::getSupportedContainerForCodec(d.codec)[0].ext;
             encoder.output = outputName;
             encoder.pEncoder = VideoEncoder::create(d);
             mEncoders.push_back(std::move(encoder));
@@ -131,67 +131,69 @@ namespace Mogwai
         }
     }
 
-    void VideoCapture::scriptBindings(Bindings& bindings)
+    void VideoCapture::registerScriptBindings(pybind11::module& m)
     {
-        CaptureTrigger::scriptBindings(bindings);
-        auto& m = bindings.getModule();
-        auto vc = m.class_<VideoCapture, CaptureTrigger>("VideoCapture");
-        bindings.addGlobalObject(kScriptVar, this, "Video Capture Helpers");
+        CaptureTrigger::registerScriptBindings(m);
+
+        pybind11::class_<VideoCapture, CaptureTrigger> videoCapture(m, "VideoCapture");
 
         // UI
         auto getUI = [](VideoCapture* pVC) { return pVC->mShowUI; };
         auto setUI = [](VideoCapture* pVC, bool show) { pVC->mShowUI = show; };
-        vc.property(kUI.c_str(), getUI, setUI);
+        videoCapture.def_property(kUI.c_str(), getUI, setUI);
 
         // Settings
         auto getCodec = [](VideoCapture* pVC) {return pVC->mpEncoderUI->getCodec(); };
         auto setCodec = [](VideoCapture* pVC, VideoEncoder::Codec c) {pVC->mpEncoderUI->setCodec(c); return pVC; };
-        vc.property(kCodec.c_str(), getCodec, setCodec);
+        videoCapture.def_property(kCodec.c_str(), getCodec, setCodec);
 
         auto getFPS = [](VideoCapture* pVC) {return pVC->mpEncoderUI->getFPS(); };
         auto setFPS = [](VideoCapture* pVC, uint32_t fps) {pVC->mpEncoderUI->setFPS(fps); return pVC; };
-        vc.property(kFps.c_str(), getFPS, setFPS);
+        videoCapture.def_property(kFps.c_str(), getFPS, setFPS);
 
         auto getBitrate = [](VideoCapture* pVC) {return pVC->mpEncoderUI->getBitrate(); };
         auto setBitrate = [](VideoCapture* pVC, float bitrate) {pVC->mpEncoderUI->setBitrate(bitrate); return pVC; };
-        vc.property(kBitrate.c_str(), getBitrate, setBitrate);
+        videoCapture.def_property(kBitrate.c_str(), getBitrate, setBitrate);
 
         auto getGopSize = [](VideoCapture* pVC) {return pVC->mpEncoderUI->getGopSize(); };
         auto setGopSize = [](VideoCapture* pVC, uint32_t gop) {pVC->mpEncoderUI->setGopSize(gop); return pVC; };
-        vc.property(kGopSize.c_str(), getGopSize, setGopSize);
+        videoCapture.def_property(kGopSize.c_str(), getGopSize, setGopSize);
 
         // Ranges
-        vc.func_(kRanges.c_str(), ScriptBindings::overload_cast<const RenderGraph*, const range_vec&>(&VideoCapture::addRanges)); // PYTHONDEPRECATED
-        vc.func_(kRanges.c_str(), ScriptBindings::overload_cast<const std::string&, const range_vec&>(&VideoCapture::addRanges)); // PYTHONDEPRECATED
-        vc.func_(kAddRanges.c_str(), ScriptBindings::overload_cast<const RenderGraph*, const range_vec&>(&VideoCapture::addRanges), "graph"_a, "ranges"_a);
-        vc.func_(kAddRanges.c_str(), ScriptBindings::overload_cast<const std::string&, const range_vec&>(&VideoCapture::addRanges), "name"_a, "ranges"_a);
+        videoCapture.def(kAddRanges.c_str(), pybind11::overload_cast<const RenderGraph*, const range_vec&>(&VideoCapture::addRanges), "graph"_a, "ranges"_a);
+        videoCapture.def(kAddRanges.c_str(), pybind11::overload_cast<const std::string&, const range_vec&>(&VideoCapture::addRanges), "name"_a, "ranges"_a);
 
         auto printGraph = [](VideoCapture* pVC, RenderGraph* pGraph) { pybind11::print(pVC->graphRangesStr(pGraph)); };
-        vc.func_(kPrint.c_str(), printGraph, "graph"_a);
+        videoCapture.def(kPrint.c_str(), printGraph, "graph"_a);
 
         auto printAllGraphs = [](VideoCapture* pVC)
         {
             std::string s;
-            for (const auto& g : pVC->mGraphRanges) { s += "`" + g.first->getName() + "`:\n" + pVC->graphRangesStr(g.first) + "\n"; }
+            for (const auto& g : pVC->mGraphRanges) { s += "'" + g.first->getName() + "':\n" + pVC->graphRangesStr(g.first) + "\n"; }
             pybind11::print(s.empty() ? "Empty" : s);
         };
-        vc.func_(kPrint.c_str(), printAllGraphs);
+        videoCapture.def(kPrint.c_str(), printAllGraphs);
     }
 
-    std::string VideoCapture::getScript()
+    std::string VideoCapture::getScriptVar() const
+    {
+        return kScriptVar;
+    }
+
+    std::string VideoCapture::getScript(const std::string& var) const
     {
         if (mGraphRanges.empty()) return "";
 
         std::string s("# Video Capture\n");
-        s += CaptureTrigger::getScript(kScriptVar);
-        s += Scripting::makeSetProperty(kScriptVar, kCodec, mpEncoderUI->getCodec());
-        s += Scripting::makeSetProperty(kScriptVar, kFps, mpEncoderUI->getFPS());
-        s += Scripting::makeSetProperty(kScriptVar, kBitrate, mpEncoderUI->getBitrate());
-        s += Scripting::makeSetProperty(kScriptVar, kGopSize, mpEncoderUI->getGopSize());
+        s += CaptureTrigger::getScript(var);
+        s += ScriptWriter::makeSetProperty(var, kCodec, mpEncoderUI->getCodec());
+        s += ScriptWriter::makeSetProperty(var, kFps, mpEncoderUI->getFPS());
+        s += ScriptWriter::makeSetProperty(var, kBitrate, mpEncoderUI->getBitrate());
+        s += ScriptWriter::makeSetProperty(var, kGopSize, mpEncoderUI->getGopSize());
 
         for (const auto& g : mGraphRanges)
         {
-            s += Scripting::makeMemberFunc(kScriptVar, kAddRanges, g.first->getName(), g.second);
+            s += ScriptWriter::makeMemberFunc(var, kAddRanges, g.first->getName(), g.second);
         }
         return s;
     }
@@ -204,7 +206,7 @@ namespace Mogwai
     void VideoCapture::addRanges(const std::string& graphName, const range_vec& ranges)
     {
         auto pGraph = mpRenderer->getGraph(graphName).get();
-        if (!pGraph) throw std::runtime_error("Can't find a graph named `" + graphName + "`");
+        if (!pGraph) throw std::runtime_error("Can't find a graph named '" + graphName + "'");
         this->addRanges(pGraph, ranges);
     }
 
@@ -212,7 +214,7 @@ namespace Mogwai
     {
         const auto& g = mGraphRanges[pGraph];
         std::string s("\t");
-        s += kRanges + " = " + to_string(g);
+        s += kRanges + " = " + ScriptBindings::repr(g);
         return s;
     }
 }

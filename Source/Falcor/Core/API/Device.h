@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -54,7 +54,7 @@ namespace Falcor
 
         /** Device configuration
         */
-        struct Desc : ScriptBindings::enable_to_string
+        struct Desc
         {
             ResourceFormat colorFormat = ResourceFormat::BGRA8UnormSrgb;    ///< The color buffer format
             ResourceFormat depthFormat = ResourceFormat::D32Float;          ///< The depth buffer format
@@ -77,7 +77,9 @@ namespace Falcor
             None = 0x0,
             ProgrammableSamplePositionsPartialOnly = 0x1, // On D3D12, this means tier 1 support. Allows one sample position to be set.
             ProgrammableSamplePositionsFull = 0x2,        // On D3D12, this means tier 2 support. Allows up to 4 sample positions to be set.
-            Raytracing = 0x4                              // On D3D12, DirectX Raytracing is supported. It is up to the user to not use raytracing functions when not supported.
+            Barycentrics = 0x4,                           // On D3D12, pixel shader barycentrics are supported.
+            Raytracing = 0x8,                             // On D3D12, DirectX Raytracing is supported. It is up to the user to not use raytracing functions when not supported.
+            RaytracingTier1_1 = 0x10,                     // On D3D12, DirectX Raytracing Tier 1.1 is supported.
         };
 
         /** Create a new device.

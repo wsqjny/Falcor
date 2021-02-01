@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -25,7 +25,6 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#pragma once
 #include "CudaInterop.h"
 #include "CopySurface.h"
 
@@ -57,7 +56,7 @@ void CudaInterop::onLoad(RenderContext* pRenderContext)
 
 void CudaInterop::onFrameRender(RenderContext* pRenderContext, const Fbo::SharedPtr& pTargetFbo)
 {
-    const float4 clearColor(0.38f, 0.52f, 0.10f, 1);
+    const Falcor::float4 clearColor(0.38f, 0.52f, 0.10f, 1);
     pRenderContext->clearFbo(pTargetFbo.get(), clearColor, 1.0f, 0, FboAttachmentType::All);
 
     // Call the CUDA kernel
@@ -72,12 +71,13 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
     if (!FalcorCUDA::initCUDA())
     {
         logError("CUDA driver API initialization failed");
-        return -1;
+        exit(1);
     }
+
     CudaInterop::UniquePtr pRenderer = std::make_unique<CudaInterop>();
     SampleConfig config;
     config.windowDesc.title = "Falcor-Cuda Interop";
     config.windowDesc.resizableWindow = true;
+
     Sample::run(config, pRenderer);
-    return 0;
 }

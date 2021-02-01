@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -47,13 +47,10 @@ namespace Falcor
         */
         virtual bool update(RenderContext* pRenderContext) { return false; }
 
-        /** Add compile-time specialization to program to use this light sampler.
-            This function must be called every frame before the sampler is bound.
-            Note that ProgramVars may need to be re-created after this call, check the return value.
-            \param[in] pProgram The Program to add compile-time specialization to.
-            \return True if the ProgramVars needs to be re-created.
+        /** Return a list of shader defines to use this light sampler.
+        *   \return Returns a list of shader defines.
         */
-        virtual bool prepareProgram(Program* pProgram) const;
+        virtual Program::DefineList getDefines() const;
 
         /** Bind the light sampler data to a given shader var
         */

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -40,12 +40,6 @@ namespace Falcor
     {
 
         static const char* kInclude = "include";
-
-        // Not supported in exporter yet
-        static const char* kLightProbes = "light_probes";
-        static const char* kLightProbeRadius = "radius";
-        static const char* kLightProbeDiffSamples = "diff_samples";
-        static const char* kLightProbeSpecSamples = "spec_samples";
 
         // Keys for values in older scene versions that are not exported anymore
         static const char* kCamFovY = "fovY";
@@ -82,6 +76,7 @@ namespace Falcor
         static const char* kLights = "lights";
         static const char* kType = "type";
         static const char* kDirLight = "dir_light";
+        static const char* kDistantLight = "distant_light";
         static const char* kPointLight = "point_light";
         static const char* kAreaLightRect = "area_light_rect";
         static const char* kAreaLightSphere = "area_light_sphere";
@@ -117,7 +112,6 @@ namespace Falcor
         bool parseSceneUnit(const rapidjson::Value& jsonVal);
         bool parseModels(const rapidjson::Value& jsonVal);
         bool parseLights(const rapidjson::Value& jsonVal);
-        bool parseLightProbes(const rapidjson::Value& jsonVal);
         bool parseCameras(const rapidjson::Value& jsonVal);
         bool parseCamera(const rapidjson::Value& jsonVal);
         bool parseAmbientIntensity(const rapidjson::Value& jsonVal);
@@ -138,6 +132,7 @@ namespace Falcor
         bool createModel(const rapidjson::Value& jsonModel);
         bool createPointLight(const rapidjson::Value& jsonLight);
         bool createDirLight(const rapidjson::Value& jsonLight);
+        bool createDistantLight(const rapidjson::Value& jsonLight);
         bool createAnalyticAreaLight(const rapidjson::Value& jsonLight);
 
         bool error(const std::string& msg);
@@ -164,7 +159,7 @@ namespace Falcor
 
     bool SceneImporterImpl::error(const std::string& msg)
     {
-        logError("Error when parsing scene file \"" + mFilename + "\".\n" + msg);
+        logError("Error when parsing scene file '" + mFilename + "'.\n" + msg);
         return false;
     }
 
@@ -249,7 +244,7 @@ namespace Falcor
                         instance.rotation = glm::radians(instance.rotation);
                     }
                 }
-                else logError("Unknown key \"" + key + "\" when parsing model instance");
+                else logError("Unknown key '" + key + "' when parsing model instance");
             }
 
             instances.push_back(instance);
@@ -296,25 +291,14 @@ namespace Falcor
             const auto& materialSettings = jsonModel[SceneKeys::kMaterial];
             if (materialSettings.IsObject() == false)
             {
-                return error("Material properties for \"" + file + "\" must be a JSON object");
+                return error("Material properties for '" + file + "' must be a JSON object");
             }
 
             for (auto m = materialSettings.MemberBegin(); m != materialSettings.MemberEnd(); m++)
             {
                 if (m->name == SceneKeys::kShadingModel)
                 {
-                    if (m->value == SceneKeys::kShadingSpecGloss)
-                    {
-                        buildFlags |= SceneBuilder::Flags::UseSpecGlossMaterials;
-                    }
-                    else if (m->value == SceneKeys::kShadingMetalRough)
-                    {
-                        buildFlags |= SceneBuilder::Flags::UseMetalRoughMaterials;
-                    }
-                    else
-                    {
-                        return error("Invalid value found in " + std::string(SceneKeys::kShadingModel) + ". Value == " + std::string(m->value.GetString()) + ".");
-                    }
+                    logWarning("Model material key '" + std::string(SceneKeys::kShadingModel) + "' is not supported. Use the scene build flags.");
                 }
             }
         }
@@ -342,6 +326,7 @@ namespace Falcor
             }
             else if (keyName == SceneKeys::kActiveAnimation)
             {
+                logWarning("Model key '" + std::string(SceneKeys::kActiveAnimation) + "' is not supported.");
 // #SCENEV2
 //                 if (jval->value.IsUint() == false)
 //                 {
@@ -350,7 +335,7 @@ namespace Falcor
 //                 uint32_t activeAnimation = jval->value.GetUint();
 //                 if (activeAnimation >= pModel->getAnimationsCount())
 //                 {
-//                     std::string msg = "Warning when parsing scene file \"" + mFilename + "\".\nModel " + pModel->getName() + " was specified with active animation " + std::to_string(activeAnimation);
+//                     std::string msg = "Warning when parsing scene file '" + mFilename + "'.\nModel " + pModel->getName() + " was specified with active animation " + std::to_string(activeAnimation);
 //                     msg += ", but model only has " + std::to_string(pModel->getAnimationsCount()) + " animations. Ignoring field";
 //                     logWarning(msg);
 //                 }
@@ -370,7 +355,7 @@ namespace Falcor
         }
 
         assert(std::filesystem::path(file).extension() != ".fscene"); // #SCENE this will cause an endless recursion. We may want to fix it
-        mBuilder.import(file.c_str(), instances);
+        mBuilder.import(file, instances);
 
         return true;
     }
@@ -379,7 +364,7 @@ namespace Falcor
     {
         if (jsonVal.IsArray() == false)
         {
-            return error("models section should be an array of objects.");
+            return error("Models section should be an array of objects.");
         }
 
         // Loop over the array
@@ -443,6 +428,59 @@ namespace Falcor
         }
 
         mBuilder.addLight(pDirLight);
+        return true;
+    }
+
+    bool SceneImporterImpl::createDistantLight(const rapidjson::Value& jsonLight)
+    {
+        auto pDistLight = DistantLight::create();
+
+        for (auto it = jsonLight.MemberBegin(); it != jsonLight.MemberEnd(); it++)
+        {
+            std::string key(it->name.GetString());
+            const auto& value = it->value;
+            if (key == SceneKeys::kName)
+            {
+                if (value.IsString() == false)
+                {
+                    return error("Distant light name should be a string");
+                }
+                std::string name = value.GetString();
+                if (name.find(' ') != std::string::npos)
+                {
+                    return error("Distant light name can't have spaces");
+                }
+                pDistLight->setName(name);
+            }
+            else if (key == SceneKeys::kType)
+            {
+                // Don't care
+            }
+            else if (key == SceneKeys::kLightIntensity)
+            {
+                float3 intensity;
+                if (getFloatVec<3>(value, "Distant light intensity", &intensity[0]) == false)
+                {
+                    return false;
+                }
+                pDistLight->setIntensity(intensity);
+            }
+            else if (key == SceneKeys::kLightDirection)
+            {
+                float3 direction;
+                if (getFloatVec<3>(value, "Distant light direction", &direction[0]) == false)
+                {
+                    return false;
+                }
+                pDistLight->setWorldDirection(direction);
+            }
+            else
+            {
+                return error("Invalid key found in distant light object. Key == " + key + ".");
+            }
+        }
+
+        mBuilder.addLight(pDistLight);
         return true;
     }
 
@@ -538,14 +576,12 @@ namespace Falcor
         auto typeKey = jsonLight.FindMember(SceneKeys::kType);
         if (typeKey == jsonLight.MemberEnd() || !typeKey->value.IsString()) error("Area light missing/invalid '" + std::string(SceneKeys::kType) + "' key");
 
-        LightType type;
-        if (typeKey->value.GetString() == SceneKeys::kAreaLightRect) type = LightType::Rect;
-        else if (typeKey->value.GetString() == SceneKeys::kAreaLightSphere) type = LightType::Sphere;
-        else if (typeKey->value.GetString() == SceneKeys::kAreaLightDisc) type = LightType::Disc;
-        else return error("Invalid area light type");
-
         // Create the light.
-        auto pAreaLight = AnalyticAreaLight::create(type);
+        AnalyticAreaLight::SharedPtr pAreaLight;
+        if (typeKey->value.GetString() == SceneKeys::kAreaLightRect) pAreaLight = RectLight::create();
+        else if (typeKey->value.GetString() == SceneKeys::kAreaLightSphere) pAreaLight = SphereLight::create();
+        else if (typeKey->value.GetString() == SceneKeys::kAreaLightDisc) pAreaLight = DiscLight::create();
+        else return error("Invalid area light type");
 
         float3 scaling(1, 1, 1);
         float3 translation(0, 0, 0);
@@ -650,6 +686,10 @@ namespace Falcor
             {
                 b = createDirLight(light);
             }
+            else if (lightType == SceneKeys::kDistantLight)
+            {
+                b = createDistantLight(light);
+            }
             else if (lightType == SceneKeys::kPointLight)
             {
                 b = createPointLight(light);
@@ -660,99 +700,13 @@ namespace Falcor
             }
             else
             {
-                return error("Unrecognized light Type \"" + lightType + "\"");
+                return error("Unrecognized light Type '" + lightType + "'");
             }
 
             if (b == false)
             {
                 return false;
             }
-        }
-
-        return true;
-    }
-
-    bool SceneImporterImpl::parseLightProbes(const rapidjson::Value& jsonVal)
-    {
-        if (jsonVal.IsArray() == false)
-        {
-            return error("Light probes should be an array of objects.");
-        }
-
-        for (uint32_t i = 0; i < jsonVal.Size(); i++)
-        {
-            const auto& lightProbe = jsonVal[i];
-
-            if (lightProbe.HasMember(SceneKeys::kFilename) == false)
-            {
-                return error("An image file must be specified for a light probe.");
-            }
-
-            // Check if path is relative, if not, assume full path
-            std::string imagePath = lightProbe[SceneKeys::kFilename].GetString();
-            std::string actualPath = mDirectory + '/' + imagePath;
-            if (doesFileExist(actualPath) == false)
-            {
-                actualPath = imagePath;
-            }
-
-            float3 position;
-            float3 intensity(1.0f);
-            float radius = -1;
-            uint32_t diffuseSamples = LightProbe::kDefaultDiffSamples;
-            uint32_t specSamples = LightProbe::kDefaultSpecSamples;
-
-            for (auto m = lightProbe.MemberBegin(); m < lightProbe.MemberEnd(); m++)
-            {
-                std::string key = m->name.GetString();
-                const auto& value = m->value;
-                if (key == SceneKeys::kLightIntensity)
-                {
-                    if (getFloatVec<3>(value, "Light probe intensity", &intensity[0]) == false)
-                    {
-                        return false;
-                    }
-                }
-                else if (key == SceneKeys::kLightPos)
-                {
-                    if (getFloatVec<3>(value, "Light probe world position", &position[0]) == false)
-                    {
-                        return false;
-                    }
-                }
-                else if (key == SceneKeys::kLightProbeRadius)
-                {
-                    if (value.IsUint() == false)
-                    {
-                        error("Light Probe radius must be a float.");
-                        return false;
-                    }
-                    radius = float(value.GetDouble());
-                }
-                else if (key == SceneKeys::kLightProbeDiffSamples)
-                {
-                    if (value.IsUint() == false)
-                    {
-                        error("Light Probe diffuse sample count must be a uint.");
-                        return false;
-                    }
-                    diffuseSamples = value.GetUint();
-                }
-                else if (key == SceneKeys::kLightProbeSpecSamples)
-                {
-                    if (value.IsUint() == false)
-                    {
-                        error("Light Probe specular sample count must be a uint.");
-                        return false;
-                    }
-                    specSamples = value.GetUint();
-                }
-            }
-
-            LightProbe::SharedPtr pLightProbe = LightProbe::create(gpDevice->getRenderContext(), actualPath, true, ResourceFormat::RGBA16Float, diffuseSamples, specSamples);
-            pLightProbe->setPosW(position);
-            pLightProbe->setIntensity(intensity);
-            mBuilder.setLightProbe(pLightProbe);
         }
 
         return true;
@@ -879,7 +833,7 @@ namespace Falcor
             }
         }
 
-        mBuilder.setCamera(pCamera);
+        mBuilder.addCamera(pCamera);
         return true;
     }
 
@@ -887,13 +841,15 @@ namespace Falcor
     {
         if (jsonVal.IsArray() == false)
         {
-            return error("Cameras section should be an array. If you want to use a single camera you can rename the section to `camera`");
+            return error("Cameras section should be an array. If you want to use a single camera you can rename the section to 'camera'");
         }
-        if(jsonVal.Size() > 1)
+
+        bool success = true;
+        for (uint i = 0; i < jsonVal.Size(); i++)
         {
-            logWarning("The scene file contains multiple cameras. The first camera in the array will be used");
+            success = parseCamera(jsonVal[0]) && success;
         }
-        return parseCamera(jsonVal[0]);
+        return success;
     }
 
     bool SceneImporterImpl::load(const std::string& filename)
@@ -965,7 +921,14 @@ namespace Falcor
 
     bool SceneImporterImpl::parseActiveCamera(const rapidjson::Value& jsonVal)
     {
-        logWarning(SceneKeys::kActiveCamera + std::string(" is not supported anymore. Using the first camera found"));
+        if (jsonVal.IsString() == false)
+        {
+            return error("Selected camera should be a name.");
+        }
+
+        std::string name(jsonVal.GetString());
+        auto it = std::find_if(mBuilder.getCameras().begin(), mBuilder.getCameras().end(), [&name] (const Camera::SharedPtr& pCamera) { return pCamera->getName() == name; });
+        if (it != mBuilder.getCameras().end()) mBuilder.setSelectedCamera(*it);
         return true;
     }
 
@@ -1002,8 +965,7 @@ namespace Falcor
             }
         }
 
-        auto pTex = Texture::createFromFile(filename, false, true);
-        mBuilder.setEnvironmentMap(pTex);
+        mBuilder.setEnvMap(EnvMap::create(filename));
         return true;
     }
 
@@ -1068,7 +1030,6 @@ namespace Falcor
 
         {SceneKeys::kModels, &SceneImporterImpl::parseModels},
         {SceneKeys::kLights, &SceneImporterImpl::parseLights},
-        {SceneKeys::kLightProbes, &SceneImporterImpl::parseLightProbes},
         {SceneKeys::kCameras, &SceneImporterImpl::parseCameras},
         {SceneKeys::kCamera, &SceneImporterImpl::parseCamera},
         {SceneKeys::kActiveCamera, &SceneImporterImpl::parseActiveCamera},  // Should come after ParseCameras
@@ -1128,11 +1089,24 @@ namespace Falcor
         return true;
     }
 
-
-    bool SceneImporter::import(const std::string& filename, SceneBuilder& builder)
+    bool SceneImporter::import(const std::string& filename, SceneBuilder& builder, const SceneBuilder::InstanceMatrices& instances, const Dictionary& dict)
     {
-        logWarning("fscene files are no longer supported in Falcor 4.0. Some properties may not be loaded.");
+        logWarning("\n"
+            "-------------------------------------------------------------------------------\n"
+            "                             DEPRECATION WARNING                               \n"
+            "fscene files are no longer supported and will be removed in the next release.  \n"
+            "Some properties may not be loaded. Please convert your file to .pyscene format.\n"
+            "-------------------------------------------------------------------------------");
+        if (!instances.empty()) logWarning("Scene importer does not support instancing.");
+
         SceneImporterImpl importer(builder);
         return importer.load(filename);
     }
+
+    REGISTER_IMPORTER(
+        SceneImporter,
+        Importer::ExtensionList({
+            "fscene"
+        })
+    )
 }

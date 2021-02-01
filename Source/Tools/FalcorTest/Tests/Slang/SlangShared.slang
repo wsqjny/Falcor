@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -36,8 +36,6 @@ BEGIN_NAMESPACE_FALCOR
     `enum Type { A, B };` is therefore the same as `enum class Type { A, B };`
     on the GPU side. We should use scoped enums by default as Slang is unlikely
     to support unscoped enums anytime soon.
-
-    `enum Type : uint` does currently not work. Add test using it when it does.
 */
 
 enum class Type1
@@ -56,7 +54,7 @@ enum class Type2
     D,
 };
 
-enum class Type3
+enum class Type3 : uint32_t /* test typed enum */
 {
     A = 0x01,
     B = 0x02,

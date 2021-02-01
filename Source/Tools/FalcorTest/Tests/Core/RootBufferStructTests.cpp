@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -42,7 +42,7 @@ namespace Falcor
         void testRootBufferInStruct(GPUUnitTestContext& ctx, const std::string& shaderModel, bool useUav)
         {
             Program::DefineList defines = { {"USE_UAV", useUav ? "1" : "0"} };
-            Shader::CompilerFlags compilerFlags = Shader::CompilerFlags::None; // Shader::CompilerFlags::DumpIntermediates;
+            Shader::CompilerFlags compilerFlags = Shader::CompilerFlags::None;
 
             ctx.createProgram("Tests/Core/RootBufferStructTests.cs.slang", "main", defines, compilerFlags, shaderModel);
             ctx.allocateStructuredBuffer("result", kNumElems);

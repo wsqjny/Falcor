@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -143,14 +143,24 @@ namespace Falcor
     }
 
 
-    SharedResourceApiHandle Resource::createSharedApiHandle()
+    SharedResourceApiHandle Resource::getSharedApiHandle() const
     {
-        ID3D12DevicePtr pDevicePtr = gpDevice->getApiHandle();
-        auto s = string_2_wstring(mName);
-        SharedResourceApiHandle pHandle;
+        if (!mSharedApiHandle)
+        {
+            ID3D12DevicePtr pDevicePtr = gpDevice->getApiHandle();
+            auto s = string_2_wstring(mName);
+            SharedResourceApiHandle pHandle;
 
-        HRESULT res = pDevicePtr->CreateSharedHandle(mApiHandle, 0, GENERIC_ALL, s.c_str(), &pHandle);
-        if (res == S_OK) return pHandle;
-        else return nullptr;
+            HRESULT res = pDevicePtr->CreateSharedHandle(mApiHandle, 0, GENERIC_ALL, s.c_str(), &pHandle);
+            if (res == S_OK)
+            {
+                mSharedApiHandle = pHandle;
+            }
+            else
+            {
+                throw std::exception("Resource::getSharedApiHandle(): failed to create shared handle");
+            }
+        }
+        return mSharedApiHandle;
     }
 }

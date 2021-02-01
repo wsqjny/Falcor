@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,9 +27,10 @@
  **************************************************************************/
 #include "stdafx.h"
 #include "Bitmap.h"
-#include "FreeImage.h"
 #include "Core/API/Texture.h"
 #include "Utils/StringUtils.h"
+
+#include <FreeImage.h>
 
 namespace Falcor
 {
@@ -43,10 +44,10 @@ namespace Falcor
 #else
     static bool isRGB32fSupported() { return false; } // FIX THIS
 #endif
-    static void genError(const std::string& errMsg, const std::string& filename)
+    static void genWarning(const std::string& errMsg, const std::string& filename)
     {
-        std::string err = "Error when loading image file " + filename + '\n' + errMsg + '.';
-        logError(err);
+        std::string err = "Error when loading image file from '" + filename + "' (" + errMsg + ")";
+        logWarning(err);
     }
 
     static bool isConvertibleToRGBA32Float(ResourceFormat format)
@@ -182,12 +183,17 @@ namespace Falcor
         return pNew;
     }
 
+    Bitmap::UniqueConstPtr Bitmap::create(uint32_t width, uint32_t height, ResourceFormat format, const uint8_t* pData)
+    {
+        return Bitmap::UniqueConstPtr(new Bitmap(width, height, format, pData));
+    }
+
     Bitmap::UniqueConstPtr Bitmap::createFromFile(const std::string& filename, bool isTopDown)
     {
         std::string fullpath;
         if (findFileInDataDirectories(filename, fullpath) == false)
         {
-            logError("Error when loading image file. Can't find image file " + filename);
+            logWarning("Error when loading image file. Can't find image file '" + filename + "'");
             return nullptr;
         }
 
@@ -201,15 +207,15 @@ namespace Falcor
 
             if (fifFormat == FIF_UNKNOWN)
             {
-                genError("Image Type unknown", filename);
+                genWarning("Image type unknown", filename);
                 return nullptr;
             }
         }
 
-        // Check the the library supports loading this image Type
+        // Check the library supports loading this image type
         if (FreeImage_FIFSupportsReading(fifFormat) == false)
         {
-            genError("Library doesn't support the file format", filename);
+            genWarning("Library doesn't support the file format", filename);
             return nullptr;
         }
 
@@ -217,57 +223,71 @@ namespace Falcor
         FIBITMAP* pDib = FreeImage_Load(fifFormat, fullpath.c_str());
         if (pDib == nullptr)
         {
-            genError("Can't read image file", filename);
+            genWarning("Can't read image file", filename);
             return nullptr;
         }
 
         // Create the bitmap
-        auto pBmp = new Bitmap;
-        pBmp->mHeight = FreeImage_GetHeight(pDib);
-        pBmp->mWidth = FreeImage_GetWidth(pDib);
+        const uint32_t height = FreeImage_GetHeight(pDib);
+        const uint32_t width = FreeImage_GetWidth(pDib);
 
-        if (pBmp->mHeight == 0 || pBmp->mWidth == 0 || FreeImage_GetBits(pDib) == nullptr)
+        if (height == 0 || width == 0 || FreeImage_GetBits(pDib) == nullptr)
         {
-            genError("Invalid image", filename);
+            genWarning("Invalid image", filename);
             return nullptr;
         }
 
+        // Convert palettized images to RGBA.
+        FREE_IMAGE_COLOR_TYPE colorType = FreeImage_GetColorType(pDib);
+        if (colorType == FIC_PALETTE)
+        {
+            auto pNew = FreeImage_ConvertTo32Bits(pDib);
+            FreeImage_Unload(pDib);
+            pDib = pNew;
+
+            if (pDib == nullptr)
+            {
+                genWarning("Failed to convert palettized image to RGBA format", filename);
+                return nullptr;
+            }
+        }
+
+        ResourceFormat format = ResourceFormat::Unknown;
         uint32_t bpp = FreeImage_GetBPP(pDib);
         switch(bpp)
         {
         case 128:
-            pBmp->mFormat = ResourceFormat::RGBA32Float;    // 4xfloat32 HDR format
+            format = ResourceFormat::RGBA32Float;    // 4xfloat32 HDR format
             break;
         case 96:
-            pBmp->mFormat = isRGB32fSupported() ? ResourceFormat::RGB32Float : ResourceFormat::RGBA32Float;     // 3xfloat32 HDR format
+            format = isRGB32fSupported() ? ResourceFormat::RGB32Float : ResourceFormat::RGBA32Float;     // 3xfloat32 HDR format
             break;
         case 64:
-            pBmp->mFormat = ResourceFormat::RGBA16Float;    // 4xfloat16 HDR format
+            format = ResourceFormat::RGBA16Float;    // 4xfloat16 HDR format
             break;
         case 48:
-            pBmp->mFormat = ResourceFormat::RGB16Float;     // 3xfloat16 HDR format
+            format = ResourceFormat::RGB16Float;     // 3xfloat16 HDR format
             break;
         case 32:
-            pBmp->mFormat = ResourceFormat::BGRA8Unorm;
+            format = ResourceFormat::BGRA8Unorm;
             break;
         case 24:
-            pBmp->mFormat = ResourceFormat::BGRX8Unorm;
+            format = ResourceFormat::BGRX8Unorm;
             break;
         case 16:
-            pBmp->mFormat = ResourceFormat::RG8Unorm;
+            format = ResourceFormat::RG8Unorm;
             break;
         case 8:
-            pBmp->mFormat = ResourceFormat::R8Unorm;
+            format = ResourceFormat::R8Unorm;
             break;
         default:
-            genError("Unknown bits-per-pixel", filename);
+            genWarning("Unknown bits-per-pixel", filename);
             return nullptr;
         }
 
         // Convert the image to RGBX image
         if (bpp == 24)
         {
-            logWarning("Converting 24-bit texture to 32-bit");
             bpp = 32;
             auto pNew = FreeImage_ConvertTo32Bits(pDib);
             FreeImage_Unload(pDib);
@@ -275,26 +295,42 @@ namespace Falcor
         }
         else if (bpp == 96 && (isRGB32fSupported() == false))
         {
-            logWarning("Converting 96-bit texture to 128-bit");
             bpp = 128;
             auto pNew = convertToRGBAF(pDib);
             FreeImage_Unload(pDib);
             pDib = pNew;
         }
 
-        uint32_t bytesPerPixel = bpp / 8;
-
-        pBmp->mpData = new uint8_t[pBmp->mHeight * pBmp->mWidth * bytesPerPixel];
-        FreeImage_ConvertToRawBits(pBmp->mpData, pDib, pBmp->mWidth * bytesPerPixel, bpp, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, isTopDown);
-
+        UniqueConstPtr pBmp = UniqueConstPtr(new Bitmap(width, height, format));
+        FreeImage_ConvertToRawBits(pBmp->getData(), pDib, pBmp->getRowPitch(), bpp, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, isTopDown);
         FreeImage_Unload(pDib);
-        return UniqueConstPtr(pBmp);
+        return pBmp;
     }
 
-    Bitmap::~Bitmap()
+    Bitmap::Bitmap(uint32_t width, uint32_t height, ResourceFormat format)
+        : mWidth(width)
+        , mHeight(height)
+        , mFormat(format)
+        , mRowPitch(getFormatRowPitch(format, width))
     {
-        delete[] mpData;
-        mpData = nullptr;
+        if (isCompressedFormat(format))
+        {
+            uint32_t blockSizeY = getFormatHeightCompressionRatio(format);
+            assert(height % blockSizeY == 0); // Should divide evenly
+            mSize = mRowPitch * (height / blockSizeY);
+        }
+        else
+        {
+            mSize = height * mRowPitch;
+        }
+
+        mpData = std::unique_ptr<uint8_t[]>(new uint8_t[mSize]);
+    }
+
+    Bitmap::Bitmap(uint32_t width, uint32_t height, ResourceFormat format, const uint8_t* pData)
+        : Bitmap(width, height, format)
+    {
+        std::memcpy(mpData.get(), pData, mSize);
     }
 
     static FREE_IMAGE_FORMAT toFreeImageFormat(Bitmap::FileFormat fmt)
@@ -344,14 +380,15 @@ namespace Falcor
             /* TgaFile */ "tga",
             /* BmpFile */ "bmp",
             /* PfmFile */ "pfm",
-            /* ExrFile */ "exr"
+            /* ExrFile */ "exr",
+            /* DdsFile */ "dds"
         };
 
         for (uint32_t i = 0 ; i < arraysize(kExtensions) ; i++)
         {
             if (kExtensions[i] == ext) return Bitmap::FileFormat(i);
         }
-        logError("Can't find a matching format for file extension `" + ext + "`");
+        logError("Can't find a matching format for file extension '" + ext + "'");
         return Bitmap::FileFormat(-1);
     }
 
@@ -381,6 +418,9 @@ namespace Falcor
             filters.push_back({ "bmp", "Bitmap Image File" });
             filters.push_back({ "tga", "Truevision Graphics Adapter" });
         }
+
+        // DDS can store all formats
+        filters.push_back({ "dds", "DirectDraw Surface" });
 
         // List of formats we can only load from
         if (format == ResourceFormat::Unknown)
@@ -423,12 +463,17 @@ namespace Falcor
             return;
         }
 
+        if (fileFormat == FileFormat::DdsFile)
+        {
+            logError("Bitmap::saveImage cannot save DDS files. Use ImageIO instead.");
+            return;
+        }
+
         int flags = 0;
         FIBITMAP* pImage = nullptr;
         uint32_t bytesPerPixel = getFormatBytesPerBlock(resourceFormat);
 
-        //TODO replace this code for swapping channels. Can't use freeimage masks b/c they only care about 16 bpp images
-        //issue #74 in gitlab
+        // TODO: Replace this code for swapping channels. Can't use freeimage masks b/c they only care about 16 bpp images.
         if (resourceFormat == ResourceFormat::RGBA8Unorm || resourceFormat == ResourceFormat::RGBA8Snorm || resourceFormat == ResourceFormat::RGBA8UnormSrgb)
         {
             for (uint32_t a = 0; a < width*height; a++)
@@ -585,7 +630,10 @@ namespace Falcor
             }
         }
 
-        FreeImage_Save(toFreeImageFormat(fileFormat), pImage, filename.c_str(), flags);
+        if (!FreeImage_Save(toFreeImageFormat(fileFormat), pImage, filename.c_str(), flags))
+        {
+            logError("Bitmap::saveImage: FreeImage failed to save image");
+        }
         FreeImage_Unload(pImage);
     }
 }

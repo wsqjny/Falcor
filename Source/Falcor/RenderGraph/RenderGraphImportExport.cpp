@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -58,7 +58,7 @@ namespace Falcor
     bool loadFailed(std::exception e, const std::string& filename)
     {
         logError(e.what(), Logger::MsgBox::None);
-        auto res = msgBox(std::string("Error when importing graph from file `" + filename + "`\n" + e.what() + "\n\nWould you like to try and reload the file?").c_str(), MsgBoxType::YesNo);
+        auto res = msgBox(std::string("Error when importing graph from file '" + filename + "'\n" + e.what() + "\n\nWould you like to try and reload the file?").c_str(), MsgBoxType::YesNo);
         return (res == MsgBoxButton::No);
     }
 
@@ -71,9 +71,10 @@ namespace Falcor
                 updateGraphStrings(graphName, filename, funcName);
                 std::string custom;
                 if (funcName.size()) custom += "\n" + graphName + '=' + funcName + "()";
+                // TODO: Rendergraph scripts should be executed in an isolated scripting context.
                 runScriptFile(filename, custom);
 
-                auto pGraph = Scripting::getGlobalContext().getObject<RenderGraph::SharedPtr>(graphName);
+                auto pGraph = Scripting::getDefaultContext().getObject<RenderGraph::SharedPtr>(graphName);
                 if (!pGraph) throw("Unspecified error");
 
                 pGraph->setName(graphName);
@@ -92,8 +93,9 @@ namespace Falcor
         {
             try
             {
+                // TODO: Rendergraph scripts should be executed in an isolated scripting context.
                 runScriptFile(filename, {});
-                auto scriptObj = Scripting::getGlobalContext().getObjects<RenderGraph::SharedPtr>();
+                auto scriptObj = Scripting::getDefaultContext().getObjects<RenderGraph::SharedPtr>();
                 std::vector<RenderGraph::SharedPtr> res;
                 res.reserve(scriptObj.size());
 

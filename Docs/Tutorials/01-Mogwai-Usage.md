@@ -2,6 +2,8 @@
 
 --------
 
+# Mogwai Usage
+
 ## Building Mogwai
 
 In Visual Studio:
@@ -13,15 +15,25 @@ In Visual Studio:
 ## Running Mogwai
 
 Run Mogwai from within Visual Studio (by pressing Ctrl+F5), or from the command prompt using:
-```
-Mogwai .exe [options]
 
-Options:
-    -script <file>      Load this script at startup (`.py` files)
-    -silent             Launch Mogwai minimized with input and message boxes disabled.
-                        Use with -script to run a renderer in the background.
-    -logfile <path>     Specify where to save the log file. By default, this is next to the executable.
 ```
+  Mogwai {OPTIONS}
+
+    Mogwai render application.
+
+  OPTIONS:
+
+      -h, --help                        Display this help menu.
+      -s[path], --script=[path]         Python script file to run.
+      -l[path], --logfile=[path]        File to write log into.
+      --silent                          Starts Mogwai with a minimized window
+                                        and disables mouse/keyboard input as
+                                        well as error message dialogs.
+      --width=[pixels]                  Initial window width.
+      --height=[pixels]                 Initial window height.
+```
+
+Using `--silent` together with `--script` allows to run Mogwai for rendering in the background.
 
 If you start it without specifying any options, Mogwai starts with a blank screen.
 
@@ -37,10 +49,10 @@ Here, we'll load the Forward Renderer, located at `Source/Mogwai/Data/ForwardRen
 ### Loading a Scene
 Mogwai loads the scene specified by the script, if any. If the script did not load a scene or you want to load a different scene, open the load scene dialog by either going to `File` -> `Load Scene` or hitting `Ctrl + Shift + O`. Navigate to the location of the scene file you wish to load and select it. Alternatively, you can also drag-and-drop scene files into Mogwai.
 
-A sample Arcade scene is included, which can be found at `Media/Arcade/Arcade.fscene`.
+A sample Arcade scene is included, which can be found at `Media/Arcade/Arcade.pyscene`.
 
 ## Mogwai UI
-Once you have a script (and optionally, a scene) loaded, you should see something similar to 
+Once you have a script (and optionally, a scene) loaded, you should see something similar to
 
 ![MogwaiUI](./images/MogwaiUI.png)
 

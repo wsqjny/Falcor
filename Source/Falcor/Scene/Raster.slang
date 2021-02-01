@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -27,24 +27,26 @@
  **************************************************************************/
 #include "VertexAttrib.slangh"
 __exported import Scene.Scene;
-__exported import Scene.ShadingData;
+__exported import Scene.Shading;
 
 struct VSIn
 {
     // Packed vertex attributes, see PackedStaticVertexData
     float3 pos                      : POSITION;
-    float3 packedNormalBitangent    : PACKED_NORMAL_BITANGENT;
+    float3 packedNormalTangent      : PACKED_NORMAL_TANGENT;
     float2 texC                     : TEXCOORD;
 
     // Other vertex attributes
     uint meshInstanceID             : DRAW_ID;
-    float3 prevPos                  : PREV_POSITION;
+
+    // System values
+    uint vertexID                   : SV_VertexID;
 
     StaticVertexData unpack()
     {
         PackedStaticVertexData v;
         v.position = pos;
-        v.packedNormalBitangent = packedNormalBitangent;
+        v.packedNormalTangent = packedNormalTangent;
         v.texCrd = texC;
         return v.unpack();
     }
@@ -56,16 +58,15 @@ struct VSIn
 
 struct VSOut
 {
-    INTERPOLATION_MODE float3 normalW    : NORMAL;
-    INTERPOLATION_MODE float3 bitangentW : BITANGENT;
-    INTERPOLATION_MODE float2 texC       : TEXCRD;
-    INTERPOLATION_MODE float3 posW       : POSW;
-    INTERPOLATION_MODE float3 colorV     : COLOR;
-    INTERPOLATION_MODE float4 prevPosH   : PREVPOSH;
+    INTERPOLATION_MODE float3 normalW    : NORMAL;      ///< Shading normal in world space (not normalized!).
+    INTERPOLATION_MODE float4 tangentW   : TANGENT;     ///< Shading tangent in world space (not normalized!).
+    INTERPOLATION_MODE float2 texC       : TEXCRD;      ///< Texture coordinate.
+    INTERPOLATION_MODE float3 posW       : POSW;        ///< Position in world space.
+    INTERPOLATION_MODE float4 prevPosH   : PREVPOSH;    ///< Position in clip space for the previous frame.
 
     // Per-triangle data
-    nointerpolation uint meshInstanceID  : DRAW_ID;
-    nointerpolation uint materialID      : MATERIAL_ID;
+    nointerpolation uint meshInstanceID  : DRAW_ID;     ///< Mesh instance ID.
+    nointerpolation uint materialID      : MATERIAL_ID; ///< Material ID.
 
     float4 posH : SV_POSITION;
 };
@@ -83,22 +84,37 @@ VSOut defaultVS(VSIn vIn)
 
     vOut.texC = vIn.texC;
     vOut.normalW = mul(vIn.unpack().normal, gScene.getInverseTransposeWorldMatrix(vIn.meshInstanceID));
-    vOut.bitangentW = mul(vIn.unpack().bitangent, (float3x3)gScene.getWorldMatrix(vIn.meshInstanceID));
+    float4 tangent = vIn.unpack().tangent;
+    vOut.tangentW = float4(mul(tangent.xyz, (float3x3)gScene.getWorldMatrix(vIn.meshInstanceID)), tangent.w);
 
-    float4 prevPosW = mul(float4(vIn.prevPos, 1.f), gScene.getPrevWorldMatrix(vIn.meshInstanceID));
+    // Compute the vertex position in the previous frame.
+    float3 prevPos = vIn.pos;
+    MeshInstanceData meshInstance = gScene.getMeshInstance(vIn.meshInstanceID);
+    if (meshInstance.hasDynamicData())
+    {
+        uint dynamicVertexIndex = gScene.meshes[meshInstance.meshID].dynamicVbOffset + vIn.vertexID;
+        prevPos = gScene.prevVertices[dynamicVertexIndex].position;
+    }
+    float4 prevPosW = mul(float4(prevPos, 1.f), gScene.getPrevWorldMatrix(vIn.meshInstanceID));
     vOut.prevPosH = mul(prevPosW, gScene.camera.data.prevViewProjMatNoJitter);
 
-  return vOut;
+    return vOut;
 }
 
+/** Setup vertex data based on interpolated vertex attributes.
+    \param[in] vsOut Interpolated vertex attributes.
+    \param[in] faceNormalW Face normal in world space (normalized).
+    \return VertexData struct.
+*/
 VertexData prepareVertexData(VSOut vsOut, float3 faceNormalW)
 {
     VertexData v;
     v.posW = vsOut.posW;
-    v.normalW = vsOut.normalW;
-    v.bitangentW = vsOut.bitangentW;
     v.texC = vsOut.texC;
+    v.normalW = normalize(vsOut.normalW);
     v.faceNormalW = faceNormalW;
+    v.tangentW.xyz = normalize(vsOut.tangentW.xyz);
+    v.tangentW.w = sign(vsOut.tangentW.w); // Preserve zero to indicate invalid tangent.
     return v;
 }
 

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -83,7 +83,7 @@ namespace Falcor
     {
         if (mPasses.find(className) != mPasses.end())
         {
-            logWarning("Trying to register a render-pass `" + std::string(className) + "` to the render-passes library,  but a render-pass with the same name already exists. Ignoring the new definition");
+            logWarning("Trying to register a render-pass '" + std::string(className) + "' to the render-passes library,  but a render-pass with the same name already exists. Ignoring the new definition");
         }
         else
         {
@@ -103,12 +103,12 @@ namespace Falcor
         {
             // See if we can load a DLL with the class's name and retry
             std::string libName = className + kDllType;
-            logInfo("Can't find a render-pass named `" + std::string(className) + "`. Trying to load a render-pass library `" + libName + '`');
+            logInfo("Can't find a render-pass named '" + std::string(className) + "'. Trying to load a render-pass library '" + libName + "'");
             loadLibrary(libName);
 
             if (mPasses.find(className) == mPasses.end())
             {
-                logWarning("Trying to create a render-pass named `" + std::string(className) + "`, but no such class exists in the library");
+                logWarning("Trying to create a render-pass named '" + std::string(className) + "', but no such class exists in the library");
                 return nullptr;
             }
         }
@@ -154,13 +154,13 @@ namespace Falcor
 
         if (doesFileExist(fullpath) == false)
         {
-            logWarning("Can't load render-pass library `" + fullpath + "`. File not found");
+            logWarning("Can't load render-pass library '" + fullpath + "'. File not found");
             return;
         }
 
         if (mLibs.find(fullpath) != mLibs.end())
         {
-            logInfo("Render-pass library `" + fullpath + "` already loaded. Ignoring `loadLibrary()` call");
+            logInfo("Render-pass library '" + fullpath + "' already loaded. Ignoring 'loadLibrary()' call");
             return;
         }
 
@@ -186,6 +186,10 @@ namespace Falcor
         func(lib);
 
         for (auto& p : lib.mPasses) registerInternal(p.second.className, p.second.desc, p.second.func, l);
+
+        // Re-import falcor package to current (executing) scripting context.
+        auto ctx = Scripting::getCurrentContext();
+        if (Scripting::isRunning()) Scripting::runScript("from falcor import *", ctx);
     }
 
     void RenderPassLibrary::releaseLibrary(const std::string& filename)
@@ -195,7 +199,7 @@ namespace Falcor
         auto libIt = mLibs.find(fullpath);
         if (libIt == mLibs.end())
         {
-            logWarning("Can't unload render-pass library `" + fullpath + "`. The library wasn't loaded");
+            logWarning("Can't unload render-pass library '" + fullpath + "'. The library wasn't loaded");
             return;
         }
 

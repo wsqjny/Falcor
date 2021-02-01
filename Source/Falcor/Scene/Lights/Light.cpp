@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -42,6 +42,17 @@ namespace Falcor
         return true;
     }
 
+    // Light
+
+    void Light::setActive(bool active)
+    {
+        if (active != mActive)
+        {
+            mActive = active;
+            mActiveChanged = true;
+        }
+    }
+
     void Light::setIntensity(const float3& intensity)
     {
         mData.intensity = intensity;
@@ -50,18 +61,21 @@ namespace Falcor
     Light::Changes Light::beginFrame()
     {
         mChanges = Changes::None;
+        if (mActiveChanged) mChanges |= Changes::Active;
         if (mPrevData.posW != mData.posW) mChanges |= Changes::Position;
         if (mPrevData.dirW != mData.dirW) mChanges |= Changes::Direction;
         if (mPrevData.intensity != mData.intensity) mChanges |= Changes::Intensity;
         if (mPrevData.openingAngle != mData.openingAngle) mChanges |= Changes::SurfaceArea;
         if (mPrevData.penumbraAngle != mData.penumbraAngle) mChanges |= Changes::SurfaceArea;
+        if (mPrevData.cosSubtendedAngle != mData.cosSubtendedAngle) mChanges |= Changes::SurfaceArea;
         if (mPrevData.surfaceArea != mData.surfaceArea) mChanges |= Changes::SurfaceArea;
+        if (mPrevData.transMat != mData.transMat) mChanges |= (Changes::Position & Changes::Direction);
 
         assert(mPrevData.tangent == mData.tangent);
         assert(mPrevData.bitangent == mData.bitangent);
-        assert(mPrevData.transMat == mData.transMat);
 
         mPrevData = mData;
+        mActiveChanged = false;
 
         return getChanges();
     }
@@ -131,91 +145,44 @@ namespace Falcor
         setIntensity(mUiLightIntensityColor * mUiLightIntensityScale);
     }
 
-    void Light::renderUI(Gui* pGui, const char* group)
+    void Light::renderUI(Gui::Widgets& widget)
     {
-        if (!group) group = "General Light Settings";
-        Gui::Group g(pGui, group);
-        if (g.open())
-        {
-            float3 color = getColorForUI();
-            if (g.rgbColor("Color", color))
-            {
-                setColorFromUI(color);
-            }
-            float intensity = getIntensityForUI();
-            if (g.var("Intensity", intensity))
-            {
-                setIntensityFromUI(intensity);
-            }
+        bool active = isActive();
+        if (widget.checkbox("Active", active)) setActive(active);
 
-            g.release();
+        if (mHasAnimation) widget.checkbox("Animated", mIsAnimated);
+
+        float3 color = getColorForUI();
+        if (widget.rgbColor("Color", color))
+        {
+            setColorFromUI(color);
+        }
+
+        float intensity = getIntensityForUI();
+        if (widget.var("Intensity", intensity))
+        {
+            setIntensityFromUI(intensity);
         }
     }
 
-    DirectionalLight::DirectionalLight() : mDistance(-1.0f)
+    Light::Light(const std::string& name, LightType type)
+        : mName(name)
     {
-        mData.type = LightType::Directional;
+        mData.type = (uint32_t)type;
     }
 
-    DirectionalLight::SharedPtr DirectionalLight::create()
+    // PointLight
+
+    PointLight::SharedPtr PointLight::create(const std::string& name)
     {
-        DirectionalLight* pLight = new DirectionalLight;
-        return SharedPtr(pLight);
+        return SharedPtr(new PointLight(name));
     }
 
-    DirectionalLight::~DirectionalLight() = default;
-
-    void DirectionalLight::renderUI(Gui* pGui, const char* group)
+    PointLight::PointLight(const std::string& name)
+        : Light(name, LightType::Point)
     {
-        if (!group) group = "Directional Light Settings";
-        Gui::Group g(pGui, group);
-        if (g.open())
-        {
-            if (g.direction("Direction", mData.dirW))
-            {
-                setWorldDirection(mData.dirW);
-            }
-            Light::renderUI(pGui);
-            g.release();
-        }
+        mPrevData = mData;
     }
-
-    void DirectionalLight::setWorldDirection(const float3& dir)
-    {
-        if (!(glm::length(dir) > 0.f)) // NaNs propagate
-        {
-            logWarning("Can't set light direction to zero length vector. Ignoring call.");
-            return;
-        }
-        mData.dirW = normalize(dir);
-        mData.posW = mCenter - mData.dirW * mDistance; // Move light's position sufficiently far away
-    }
-
-    void DirectionalLight::setWorldParams(const float3& center, float radius)
-    {
-        mDistance = radius;
-        mCenter = center;
-        mData.posW = mCenter - mData.dirW * mDistance; // Move light's position sufficiently far away
-    }
-
-    float DirectionalLight::getPower() const
-    {
-        const float surfaceArea = (float)M_PI * mDistance * mDistance;
-        return luminance(mData.intensity) * surfaceArea;
-    }
-
-    PointLight::SharedPtr PointLight::create()
-    {
-        PointLight* pLight = new PointLight;
-        return SharedPtr(pLight);
-    }
-
-    PointLight::PointLight()
-    {
-        mData.type = LightType::Point;
-    }
-
-    PointLight::~PointLight() = default;
 
     void PointLight::setWorldDirection(const float3& dir)
     {
@@ -237,26 +204,20 @@ namespace Falcor
         return luminance(mData.intensity) * 4.f * (float)M_PI;
     }
 
-    void PointLight::renderUI(Gui* pGui, const char* group)
+    void PointLight::renderUI(Gui::Widgets& widget)
     {
-        if (!group) group = "Point Light Settings";
-        Gui::Group g(pGui, group);
-        if (g.open())
+        Light::renderUI(widget);
+
+        widget.var("World Position", mData.posW, -FLT_MAX, FLT_MAX);
+        widget.direction("Direction", mData.dirW);
+
+        if (widget.var("Opening Angle", mData.openingAngle, 0.f, (float)M_PI))
         {
-            g.var("World Position", mData.posW, -FLT_MAX, FLT_MAX);
-            g.direction("Direction", mData.dirW);
-
-            if (g.var("Opening Angle", mData.openingAngle, 0.f, (float)M_PI))
-            {
-                setOpeningAngle(mData.openingAngle);
-            }
-            if (g.var("Penumbra Width", mData.penumbraAngle, 0.f, (float)M_PI))
-            {
-                setPenumbraAngle(mData.penumbraAngle);
-            }
-            Light::renderUI(pGui);
-
-            g.release();
+            setOpeningAngle(mData.openingAngle);
+        }
+        if (widget.var("Penumbra Width", mData.penumbraAngle, 0.f, (float)M_PI))
+        {
+            setPenumbraAngle(mData.penumbraAngle);
         }
     }
 
@@ -266,8 +227,8 @@ namespace Falcor
         if (openingAngle == mData.openingAngle) return;
 
         mData.openingAngle = openingAngle;
-        /* Prepare an auxiliary cosine of the opening angle to quickly check whether we're within the cone of a spot light */
-        mData.cosOpeningAngle = cos(openingAngle);
+        // Prepare an auxiliary cosine of the opening angle to quickly check whether we're within the cone of a spot light.
+        mData.cosOpeningAngle = std::cos(openingAngle);
     }
 
     void PointLight::setPenumbraAngle(float angle)
@@ -277,41 +238,145 @@ namespace Falcor
         mData.penumbraAngle = angle;
     }
 
-    // Code for analytic area lights.
-    AnalyticAreaLight::SharedPtr AnalyticAreaLight::create(LightType type)
+    void PointLight::updateFromAnimation(const glm::mat4& transform)
     {
-        AnalyticAreaLight* pLight = new AnalyticAreaLight(type);
-        return SharedPtr(pLight);
+        float3 fwd = float3(transform[2]);
+        float3 pos = float3(transform[3]);
+        setWorldPosition(pos);
+        setWorldDirection(fwd);
     }
 
-    AnalyticAreaLight::AnalyticAreaLight(LightType type)
+    // DirectionalLight
+
+    DirectionalLight::DirectionalLight(const std::string& name)
+        : Light(name, LightType::Directional)
     {
-        mData.type = type;
+        mPrevData = mData;
+    }
+
+    DirectionalLight::SharedPtr DirectionalLight::create(const std::string& name)
+    {
+        return SharedPtr(new DirectionalLight(name));
+    }
+
+    void DirectionalLight::renderUI(Gui::Widgets& widget)
+    {
+        Light::renderUI(widget);
+
+        if (widget.direction("Direction", mData.dirW))
+        {
+            setWorldDirection(mData.dirW);
+        }
+    }
+
+    void DirectionalLight::setWorldDirection(const float3& dir)
+    {
+        if (!(glm::length(dir) > 0.f)) // NaNs propagate
+        {
+            logWarning("Can't set light direction to zero length vector. Ignoring call.");
+            return;
+        }
+        mData.dirW = normalize(dir);
+    }
+
+    void DirectionalLight::updateFromAnimation(const glm::mat4& transform)
+    {
+        float3 fwd = float3(transform[2]);
+        setWorldDirection(fwd);
+    }
+
+    // DistantLight
+
+    DistantLight::SharedPtr DistantLight::create(const std::string& name)
+    {
+        return SharedPtr(new DistantLight(name));
+    }
+
+    DistantLight::DistantLight(const std::string& name)
+        : Light(name, LightType::Distant)
+    {
+        mData.dirW = float3(0.f, -1.f, 0.f);
+        setAngle(0.5f * 0.53f * (float)M_PI / 180.f);   // Approximate sun half-angle
+        update();
+        mPrevData = mData;
+    }
+
+    void DistantLight::renderUI(Gui::Widgets& widget)
+    {
+        Light::renderUI(widget);
+
+        if (widget.direction("Direction", mData.dirW))
+        {
+            setWorldDirection(mData.dirW);
+        }
+
+        if (widget.var("Half-angle", mAngle, 0.f, (float)M_PI_2))
+        {
+            setAngle(mAngle);
+        }
+        widget.tooltip("Half-angle subtended by the light, in radians.");
+    }
+
+    void DistantLight::setAngle(float angle)
+    {
+        mAngle = glm::clamp(angle, 0.f, (float)M_PI_2);
+
+        mData.cosSubtendedAngle = std::cos(mAngle);
+    }
+
+    void DistantLight::setWorldDirection(const float3& dir)
+    {
+        if (!(glm::length(dir) > 0.f)) // NaNs propagate
+        {
+            logWarning("Can't set light direction to zero length vector. Ignoring call.");
+            return;
+        }
+        mData.dirW = normalize(dir);
+        update();
+    }
+
+    void DistantLight::update()
+    {
+        // Update transformation matrices
+        // Assumes that mData.dirW is normalized
+        const float3 up(0.f, 0.f, 1.f);
+        float3 vec = glm::cross(up, -mData.dirW);
+        float sinTheta = glm::length(vec);
+        if (sinTheta > 0.f)
+        {
+            float cosTheta = glm::dot(up, -mData.dirW);
+            mData.transMat = glm::rotate(glm::mat4(), std::acos(cosTheta), vec);
+        }
+        else
+        {
+            mData.transMat = glm::mat4();
+        }
+        mData.transMatIT = glm::inverse(glm::transpose(mData.transMat));
+    }
+
+    void DistantLight::updateFromAnimation(const glm::mat4& transform)
+    {
+        float3 fwd = float3(transform[2]);
+        setWorldDirection(fwd);
+    }
+
+    // AnalyticAreaLight
+
+    AnalyticAreaLight::AnalyticAreaLight(const std::string& name, LightType type)
+        : Light(name, type)
+    {
         mData.tangent = float3(1, 0, 0);
         mData.bitangent = float3(0, 1, 0);
         mData.surfaceArea = 4.0f;
 
         mScaling = float3(1, 1, 1);
         update();
+        mPrevData = mData;
     }
-
-    AnalyticAreaLight::~AnalyticAreaLight() = default;
 
     float AnalyticAreaLight::getPower() const
     {
         return luminance(mData.intensity) * (float)M_PI * mData.surfaceArea;
-    }
-
-    void AnalyticAreaLight::renderUI(Gui* pGui, const char* group)
-    {
-        if (!group) group = "Analytic Area Light Settings";
-        Gui::Group g(pGui, group);
-        if (g.open())
-        {
-            Light::renderUI(pGui);
-
-            g.release();
-        }
     }
 
     void AnalyticAreaLight::update()
@@ -319,58 +384,93 @@ namespace Falcor
         // Update matrix
         mData.transMat = mTransformMatrix * glm::scale(glm::mat4(), mScaling);
         mData.transMatIT = glm::inverse(glm::transpose(mData.transMat));
-
-        switch (mData.type)
-        {
-
-        case LightType::Rect:
-        {
-            float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
-            float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
-            mData.surfaceArea = 4.0f * rx * ry;
-        }
-        break;
-
-        case LightType::Sphere:
-        {
-            float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
-            float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
-            float rz = glm::length(mData.transMat * float4(0.0f, 0.0f, 1.0f, 0.0f));
-
-            mData.surfaceArea = 4.0f * (float)M_PI * pow(pow(rx * ry, 1.6f) + pow(ry * rz, 1.6f) + pow(rx * rz, 1.6f) / 3.0f, 1.0f / 1.6f);
-        }
-        break;
-
-        case LightType::Disc:
-        {
-            float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
-            float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
-
-            mData.surfaceArea = (float)M_PI * rx * ry;
-        }
-        break;
-
-        default:
-            break;
-        }
     }
+
+    // RectLight
+
+    RectLight::SharedPtr RectLight::create(const std::string& name)
+    {
+        return SharedPtr(new RectLight(name));
+    }
+
+    void RectLight::update()
+    {
+        AnalyticAreaLight::update();
+
+        float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
+        float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
+        mData.surfaceArea = 4.0f * rx * ry;
+    }
+
+    // DiscLight
+
+    DiscLight::SharedPtr DiscLight::create(const std::string& name)
+    {
+        return SharedPtr(new DiscLight(name));
+    }
+
+    void DiscLight::update()
+    {
+        AnalyticAreaLight::update();
+
+        float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
+        float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
+
+        mData.surfaceArea = (float)M_PI * rx * ry;
+    }
+
+    // SphereLight
+
+    SphereLight::SharedPtr SphereLight::create(const std::string& name)
+    {
+        return SharedPtr(new SphereLight(name));
+    }
+
+    void SphereLight::update()
+    {
+        AnalyticAreaLight::update();
+
+        float rx = glm::length(mData.transMat * float4(1.0f, 0.0f, 0.0f, 0.0f));
+        float ry = glm::length(mData.transMat * float4(0.0f, 1.0f, 0.0f, 0.0f));
+        float rz = glm::length(mData.transMat * float4(0.0f, 0.0f, 1.0f, 0.0f));
+
+        mData.surfaceArea = 4.0f * (float)M_PI * std::pow(std::pow(rx * ry, 1.6f) + std::pow(ry * rz, 1.6f) + std::pow(rx * rz, 1.6f) / 3.0f, 1.0f / 1.6f);
+    }
+
 
     SCRIPT_BINDING(Light)
     {
-        auto light = m.regClass(Light);
-        light.roProperty("name", &Light::getName);
-        light.property("intensity", &Light::getIntensityForScript, &Light::setIntensityFromScript);
-        light.property("color", &Light::getColorForScript, &Light::setColorFromScript);
+        pybind11::class_<Light, Animatable, Light::SharedPtr> light(m, "Light");
+        light.def_property("name", &Light::getName, &Light::setName);
+        light.def_property("active", &Light::isActive, &Light::setActive);
+        light.def_property("animated", &Light::isAnimated, &Light::setIsAnimated);
+        light.def_property("intensity", &Light::getIntensity, &Light::setIntensity);
 
-        auto directionalLight = m.class_<DirectionalLight, Light>("DirectionalLight");
-        directionalLight.property("direction", &DirectionalLight::getWorldDirection, &DirectionalLight::setWorldDirection);
+        pybind11::class_<PointLight, Light, PointLight::SharedPtr> pointLight(m, "PointLight");
+        pointLight.def(pybind11::init(&PointLight::create), "name"_a = "");
+        pointLight.def_property("position", &PointLight::getWorldPosition, &PointLight::setWorldPosition);
+        pointLight.def_property("direction", &PointLight::getWorldDirection, &PointLight::setWorldDirection);
+        pointLight.def_property("openingAngle", &PointLight::getOpeningAngle, &PointLight::setOpeningAngle);
+        pointLight.def_property("penumbraAngle", &PointLight::getPenumbraAngle, &PointLight::setPenumbraAngle);
 
-        auto pointLight = m.class_<PointLight, Light>("PointLight");
-        pointLight.property("position", &PointLight::getWorldPosition, &PointLight::setWorldPosition);
-        pointLight.property("direction", &PointLight::getWorldDirection, &PointLight::setWorldDirection);
-        pointLight.property("openingAngle", &PointLight::getOpeningAngle, &PointLight::setOpeningAngle);
-        pointLight.property("penumbraAngle", &PointLight::getPenumbraAngle, &PointLight::setPenumbraAngle);
+        pybind11::class_<DirectionalLight, Light, DirectionalLight::SharedPtr> directionalLight(m, "DirectionalLight");
+        directionalLight.def(pybind11::init(&DirectionalLight::create), "name"_a = "");
+        directionalLight.def_property("direction", &DirectionalLight::getWorldDirection, &DirectionalLight::setWorldDirection);
 
-        m.class_<AnalyticAreaLight, Light>("AnalyticAreaLight");
-    }
+        pybind11::class_<DistantLight, Light, DistantLight::SharedPtr> distantLight(m, "DistantLight");
+        distantLight.def(pybind11::init(&DistantLight::create), "name"_a = "");
+        distantLight.def_property("direction", &DistantLight::getWorldDirection, &DistantLight::setWorldDirection);
+        distantLight.def_property("angle", &DistantLight::getAngle, &DistantLight::setAngle);
+
+        pybind11::class_<AnalyticAreaLight, Light, AnalyticAreaLight::SharedPtr> analyticLight(m, "AnalyticAreaLight");
+
+        pybind11::class_<RectLight, AnalyticAreaLight, RectLight::SharedPtr> rectLight(m, "RectLight");
+        rectLight.def(pybind11::init(&RectLight::create), "name"_a = "");
+
+        pybind11::class_<DiscLight, AnalyticAreaLight, DiscLight::SharedPtr> discLight(m, "DiscLight");
+        discLight.def(pybind11::init(&DiscLight::create), "name"_a = "");
+
+        pybind11::class_<SphereLight, AnalyticAreaLight, SphereLight::SharedPtr> sphereLight(m, "SphereLight");
+        sphereLight.def(pybind11::init(&SphereLight::create), "name"_a = "");
+   }
 }

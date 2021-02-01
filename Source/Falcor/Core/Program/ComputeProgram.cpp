@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -46,8 +46,18 @@ namespace Falcor
         return pProg;
     }
 
+    void ComputeProgram::dispatchCompute(
+        ComputeContext* pContext,
+        ComputeVars* pVars,
+        uint3 const& threadGroupCount)
+    {
+        auto pState = ComputeState::create();
+        pState->setProgram(std::static_pointer_cast<ComputeProgram>(shared_from_this()));
+        pContext->dispatch(pState.get(), pVars, threadGroupCount);
+    }
+
     SCRIPT_BINDING(ComputeProgram)
     {
-        m.regClass(ComputeProgram);
+        pybind11::class_<ComputeProgram, ComputeProgram::SharedPtr>(m, "ComputeProgram");
     }
 }

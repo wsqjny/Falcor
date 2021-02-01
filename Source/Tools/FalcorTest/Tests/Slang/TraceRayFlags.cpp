@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -43,14 +43,14 @@ namespace Falcor
                 D3D12_RAY_FLAG_CULL_OPAQUE |
                 D3D12_RAY_FLAG_CULL_NON_OPAQUE;
         }
-#if 0
+
         uint32_t getRayFlags1_1()
         {
             return getRayFlags1_0() |
                 D3D12_RAY_FLAG_SKIP_TRIANGLES |
                 D3D12_RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES;
         }
-#endif
+
         void testRayFlags(GPUUnitTestContext& ctx, uint32_t expected, const Program::DefineList& defines, const std::string& shaderModel)
         {
             ctx.createProgram("Tests/Slang/TraceRayFlags.cs.slang", "testRayFlags", defines, Shader::CompilerFlags::None, shaderModel);
@@ -67,10 +67,9 @@ namespace Falcor
     {
         testRayFlags(ctx, getRayFlags1_0(), {}, "6_3");
     }
-#if 0
-    GPU_TEST(TraceRayFlagsDXR1_1, "Requires shader model 6.5")
+
+    GPU_TEST(TraceRayFlagsDXR1_1)
     {
         testRayFlags(ctx, getRayFlags1_1(), { { "DXR_1_1", ""} }, "6_5");
     }
-#endif
 }

@@ -13,7 +13,7 @@
  #    contributors may be used to endorse or promote products derived
  #    from this software without specific prior written permission.
  #
- # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -25,6 +25,7 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
+#include "CompositeMode.slangh"
 
 /** Simple composite pass that blends two buffers together.
 */
@@ -36,9 +37,22 @@ cbuffer CB
     float scaleB;
 }
 
-Texture2D A;
-Texture2D B;
-RWTexture2D output;
+// Inputs
+Texture2D<float4> A;
+Texture2D<float4> B;
+
+// Output
+#if !defined(OUTPUT_FORMAT)
+#error OUTPUT_FORMAT is undefined
+#elif OUTPUT_FORMAT == OUTPUT_FORMAT_FLOAT
+RWTexture2D<float4> output;
+#elif OUTPUT_FORMAT == OUTPUT_FORMAT_UINT
+RWTexture2D<uint4> output;
+#elif OUTPUT_FORMAT == OUTPUT_FORMAT_SINT
+RWTexture2D<int4> output;
+#else
+#error OUTPUT_FORMAT unknown
+#endif
 
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
@@ -46,5 +60,19 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     const uint2 pixel = dispatchThreadId.xy;
     if (any(pixel >= frameDim)) return;
 
-    output[pixel] = scaleA * A[pixel] + scaleB * B[pixel];
+    float4 result = float4(0.f);
+#if !defined(COMPOSITE_MODE)
+    #error COMPOSITE_MODE is undefined
+#elif COMPOSITE_MODE == COMPOSITE_MODE_ADD
+    result = (scaleA * A[pixel]) + (scaleB * B[pixel]);
+#elif COMPOSITE_MODE == COMPOSITE_MODE_MULTIPLY
+    result = (scaleA * A[pixel]) * (scaleB * B[pixel]);
+#else
+    #error COMPOSITE_MODE unknown
+#endif
+
+#if OUTPUT_FORMAT != OUTPUT_FORMAT_FLOAT
+    result = round(result);
+#endif
+    output[pixel] = result;
 }
